@@ -1,8 +1,5 @@
 package s3j
 
-import s3j.format
-import s3j.format.JsonEncoder
-
 // Extract important types to top level:
 
 type JsonFormat[T]  = format.JsonFormat[T]
@@ -16,5 +13,5 @@ val  JsonDecoder    = format.JsonDecoder
 
 // Bring extensions to scope:
 
-export macros.MacroExtensions.*
 export io.IoExtensions.*
+export format.BasicFormats.*

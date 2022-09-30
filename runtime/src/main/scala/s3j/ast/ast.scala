@@ -1,7 +1,9 @@
 package s3j.ast
 
-import s3j.format.JsonDecoder
+import s3j.format.{BasicFormats, JsonDecoder}
+import s3j.format.BasicFormats.jsValueFormat
 import s3j.io.AstJsonReader
+import s3j.io.IoExtensions.toJsonString
 
 import scala.annotation.targetName
 import scala.language.implicitConversions
@@ -23,7 +25,7 @@ sealed trait JsValue {
   def convertTo[T](using dec: JsonDecoder[T]): T =
     dec.decode(new AstJsonReader(this))
 
-  // TODO: toString with serialized representation
+  override def toString: String = this.toJsonString
 }
 
 case object JsNull extends JsValue

@@ -21,5 +21,19 @@ lazy val runtime = (project in file("runtime"))
 lazy val core = (project in file("core"))
   .dependsOn(runtime)
   .settings(
-    name := "s3j"
+    name := "s3j",
+
+    Test / scalacOptions ++= Seq(
+      "-Xmacro-settings:s3j:loadPlugin=Meow"
+    )
   )
+
+def exampleProject(exampleName: String): Project = Project("example-" + exampleName, file("examples/" + exampleName))
+  .dependsOn(core)
+  .settings(
+    name := "s3j-example-" + exampleName,
+    publishArtifact := false,
+    publishTo := None
+  )
+
+lazy val exampleCustomPlugin = exampleProject("custom-plugin")

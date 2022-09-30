@@ -1,6 +1,7 @@
 package s3j.io.util
 
 import java.nio.CharBuffer
+import scala.collection.mutable
 
 object CharRange {
   val empty: CharRange = new CharRange(0)
@@ -123,6 +124,9 @@ final class CharRange(val data: Array[Char]) {
     _position += length
     this
   }
+  
+  /** Append readable contents of this buffer to [[StringBuilder]], without consuming it */
+  def appendTo(sb: mutable.StringBuilder): Unit = sb.appendAll(data, _position, _limit - _position)
   
   /** @return Contents of a readable part of the buffer */
   override def toString: String = new String(_data, _position, _limit - _position)

@@ -1,6 +1,7 @@
 package s3j.annotations.naming
 
 enum CaseConvention {
+  case NoConvention         // do not alter original names
   case CamelCase            // camelCase
   case SnakeCase            // snake_case
   case ScreamingSnakeCase   // SCREAMING_SNAKE_CASE

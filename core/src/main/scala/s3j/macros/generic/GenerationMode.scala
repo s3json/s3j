@@ -1,9 +1,10 @@
-package s3j.macros
+package s3j.macros.generic
 
 import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat}
+import s3j.macros.generic.GenerationMode
 
-import scala.quoted.*
 import scala.compiletime.error
+import scala.quoted.*
 
 object GenerationMode {
   /**
@@ -16,7 +17,7 @@ object GenerationMode {
     import q.reflect.*
 
     def throwError: Nothing =
-      throw new IllegalArgumentException(s"Failed to determine generation mode from type ${t.show}. " +
+      report.errorAndAbort(s"Failed to determine generation mode from type ${t.show}. " +
         s"Expected either JsonDecoder[?], JsonEncoder[?] or JsonFormat[?]")
 
     t match {
@@ -35,7 +36,7 @@ object GenerationMode {
     def generateEncoders: Boolean = false
     def generateDecoders: Boolean = true
 
-    def wrapType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
+    def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
       import q.reflect.*
       TypeRepr.of[JsonDecoder].appliedTo(t)
     }
@@ -46,7 +47,7 @@ object GenerationMode {
     def generateEncoders: Boolean = true
     def generateDecoders: Boolean = false
 
-    def wrapType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
+    def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
       import q.reflect.*
       TypeRepr.of[JsonEncoder].appliedTo(t)
     }
@@ -57,7 +58,7 @@ object GenerationMode {
     def generateEncoders: Boolean = true
     def generateDecoders: Boolean = true
 
-    def wrapType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
+    def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
       import q.reflect.*
       TypeRepr.of[JsonFormat].appliedTo(t)
     }
@@ -71,6 +72,6 @@ sealed trait GenerationMode {
   /** @return Whether we should generate decoders in this mode or not */
   def generateDecoders: Boolean
 
-  /** @return Supplied type wrapped in a type class, e.g. when decoding, `X` transforms to `JsonDecoder[X]` */
-  def wrapType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr
+  /** @return Type class applied to given type (e.g. `JsonDecoder[X]` when decoding) */
+  def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr
 }

@@ -45,7 +45,10 @@ abstract class JsonReader {
     _savedToken
   }
 
-  /** @return Next token from the stream */
+  /** 
+   * @return Next token from the stream. Implementations are assumed to implement own state machine and don't return
+   *         illegal token sequences.
+   */
   protected def readToken(): JsonToken
 
   /**
