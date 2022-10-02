@@ -1,11 +1,17 @@
 package s3j.format.util
 
+import s3j.format.JsonDecoder
 import s3j.io.{JsonReader, JsonToken}
 
 object DecoderUtils {
   def throwUnexpected(reader: JsonReader, expected: String, token: JsonToken): Nothing =
     reader.parseError("unexpected " + JsonToken.tokenName(token) + ", expected " + expected)
-  
+
+  // null is decoded as None
+  def decodeOption[T](reader: JsonReader, decoder: JsonDecoder[T]): Option[T] =
+    if (reader.peekToken == JsonToken.TNullValue) { reader.nextToken(); None }
+    else Some(decoder.decode(reader))
+
   def skipValue(r: JsonReader): Unit = {
     var nesting = 0
     var first = false

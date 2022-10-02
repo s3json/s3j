@@ -56,8 +56,10 @@ private[casecls] class CaseClassGenerator[T](modifiers: ModifierSet)(using c: Ge
     def generateNode(low: Int, high: Int): Expr[Unit] = {
       if (low == high) {
         val key = keys(low)._1
+        val keyExpr = Expr(key)
         '{
-          if ($keyHandle.stringEquals(${ Expr(key) })) {
+          if ($keyHandle.stringEquals($keyExpr)) {
+            if (${ keyTracker.isKeyPresent(key) }) ObjectFormatUtils.throwDuplicateKey($reader, $keyExpr)
             ${ keyFound := Expr(true) }
             ${ keyTracker.markKeyPresence(key) }
             ${ decoder.decodeKey(key, reader) }
@@ -82,7 +84,7 @@ private[casecls] class CaseClassGenerator[T](modifiers: ModifierSet)(using c: Ge
         ${ generateNode(0, keys.size - 1) }
         if (!$keyFound) {
           val keyString: String = $keyHandle.toString
-          ${ generateUnknownKey(reader, decoder, '{ keyString }) }
+          ${ generateUnknownKey(reader, decoder, 'keyString) }
         }
       }
     })
@@ -102,7 +104,7 @@ private[casecls] class CaseClassGenerator[T](modifiers: ModifierSet)(using c: Ge
 
     Variable.defineVariables(keyTracker.variables ++ decoder.usedVariables, '{
       val innerReader = ObjectFormatUtils.expectBeginObject($reader)
-      ${ generateDecodingLoop('{ innerReader }, decoder, keyTracker) };
+      ${ generateDecodingLoop('innerReader, decoder, keyTracker) }
       ObjectFormatUtils.expectEndObject($reader)
       ${ decoder.decodeFinal() }
       ${ decoder.decodeResult().asExprOf[T] }

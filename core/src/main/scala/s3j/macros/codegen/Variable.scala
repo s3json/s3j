@@ -7,14 +7,15 @@ object Variable {
   /** Type conversion to directly include variables in splices */
   given variableToExpr[T]: Conversion[Variable[T], Expr[T]] = _.value
 
-  private class VariableImpl[T](name: String, val init: Expr[T], val const: Boolean)
+  private class VariableImpl[T](name: String, initCode: Quotes ?=> Expr[T], val const: Boolean)
                                (using q: Quotes, t: Type[T], n: NameGenerator)
   extends Variable[T] {
     import q.reflect.*
-
     private val _symbol: Symbol = Symbol.newVal(Symbol.spliceOwner, n.freshName(name), TypeRepr.of[T],
       if (const) Flags.EmptyFlags else Flags.Mutable, Symbol.noSymbol)
 
+
+    val init: Expr[T] = initCode(using _symbol.asQuotes)
     def symbol(using Quotes): quotes.reflect.Symbol =
       _symbol.asInstanceOf[quotes.reflect.Symbol]
 
@@ -48,7 +49,7 @@ object Variable {
    * @tparam T    Type of variable
    * @return      Variable handle
    */
-  def create[T](name: String)(init: Expr[T])(using Quotes, NameGenerator, Type[T]): Variable[T] =
+  def create[T](name: String)(init: Quotes ?=> Expr[T])(using Quotes, NameGenerator, Type[T]): Variable[T] =
     new VariableImpl[T](name, init, false)
 
   // createConst with placeholder is nonsensical
@@ -61,7 +62,7 @@ object Variable {
    * @tparam T    Type of variable
    * @return      Variable handle
    */
-  def createConst[T](name: String)(init: Expr[T])(using Quotes, NameGenerator, Type[T]): Variable[T] =
+  def createConst[T](name: String)(init: Quotes ?=> Expr[T])(using Quotes, NameGenerator, Type[T]): Variable[T] =
     new VariableImpl[T](name, init, true)
 
   /**

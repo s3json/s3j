@@ -34,21 +34,26 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
     val implicitKey: ImplicitCachingKey = ImplicitCachingKey(target)
   }
 
-  private class NestedResultImpl[T](val raw: Expr[Any]) extends NestedResult[T] {
-    def encoder: Expr[JsonEncoder[T]] = {
+  private class NestedResultImpl[T](handle: SerializerHandle)(using Type[T]) extends NestedResult[T] {
+    def raw(using q: Quotes): Expr[Any] = {
+      import q.reflect.*
+      Ref(handle.variableSymbol.asInstanceOf[Symbol]).asExpr
+    }
+
+    def encoder(using Quotes): Expr[JsonEncoder[T]] = {
       if (!generationMode.generateEncoders) {
         throw new IllegalStateException("Encoders are not generated in mode " + generationMode)
       }
 
-      raw.asInstanceOf[Expr[JsonEncoder[T]]]
+      raw.asExprOf[JsonEncoder[T]]
     }
 
-    def decoder: Expr[JsonDecoder[T]] = {
+    def decoder(using Quotes): Expr[JsonDecoder[T]] = {
       if (!generationMode.generateDecoders) {
         throw new IllegalStateException("Decoders are not generated in mode " + generationMode)
       }
 
-      raw.asInstanceOf[Expr[JsonDecoder[T]]]
+      raw.asExprOf[JsonDecoder[T]]
     }
   }
 
@@ -107,7 +112,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
               path = _genPath,
               label = None
             ) :: task.stack
-          )).variableRef.asExpr
+          ))
 
           new NestedResultImpl[T](raw)
         }
@@ -222,7 +227,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
 
   private def formatMessage(message: String, task: GenerationTask, plugin: Option[PluginContainer]): String = {
     val sb = new mutable.StringBuilder()
-    sb ++= s"While generating ${task.typeSymbol.fullName}:\n"
+    sb ++= s"\u001b[1;31mWhile generating ${task.target.show(using Printer.TypeReprShortCode)}:\u001b[0m\n"
 
     sb ++= message
     if (!message.endsWith("\n")) sb += '\n'
@@ -231,12 +236,12 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
     // TODO: stack
 
     for (p <- plugin) {
-      sb ++= s"Active plugin: ${p.name} (${p.className})\n"
+      sb ++= s"\u001b[1;34mActive plugin:\u001b[0m ${p.name} (${p.className})\n"
     }
 
     val plugins = _pluginContainers.filterNot(_.className.startsWith("s3j."))
     if (plugins.nonEmpty) {
-      sb ++= "Present plugins:\n"
+      sb ++= "\u001b[1;34mPresent plugins:\u001b[0m\n"
       for (p <- plugins) {
         sb ++= s" - ${p.name} (${p.className})"
       }
@@ -260,7 +265,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
         sb ++= "   " ++= msg ++= "\n"
       }
 
-      sb ++= "\nImplicit search result:\n - " ++= implicitError ++= "\n"
+      sb ++= "\n\u001b[1;34mImplicit search result:\u001b[0m\n" ++= implicitError ++= "\n"
 
       report.errorAndAbort(formatMessage(sb.result(), task, None))
     }
@@ -297,6 +302,11 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
     createHandle(task, key, key.identity, simpleGen = false, q => context.doGeneration(q).asInstanceOf[Term])
   }
 
+  private def searchImplicits(t: TypeRepr): ImplicitSearchResult = {
+    // TODO: Find a way to augment the search path
+    Implicits.search(t)
+  }
+
   def generateRoot(tpe: TypeRepr, modifiers: ModifierSet): Symbol =
     generate(GenerationTask(
       stack = StackEntry(tpe, modifiers, Nil, None) :: Nil
@@ -307,25 +317,27 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       return _serializers(task.basicKey)
     }
 
-    val suppressImplicits = task.isRoot || task.modifiers.values.exists(_.suppressImplicitSearch)
-    if (suppressImplicits) {
-      val failureReason =
-        if (task.isRoot) "root serializer is always generated"
-        else "suppressed by modifier(s): " + task.modifiers.values.filter(_.suppressImplicitSearch).mkString(", ")
+    val suppressImplicitsReason: Option[String] =
+      if (task.isRoot || task.typeSymbol == typeSymbol) Some("serializer for root type is always generated")
+      else if (task.modifiers.values.exists(_.suppressImplicitSearch)) {
+        val mods = task.modifiers.values.filter(_.suppressImplicitSearch)
+        Some("suppressed by modifiers: " + mods.mkString(", "))
+      } else None
 
-      return runGenerationPlugins(task, failureReason)
+    if (suppressImplicitsReason.nonEmpty) {
+      return runGenerationPlugins(task, suppressImplicitsReason.get)
     }
 
     if (_serializers.contains(task.implicitKey)) {
       return _serializers(task.implicitKey)
     }
 
-    Implicits.search(generationMode.appliedType(task.target)) match {
+    searchImplicits(generationMode.appliedType(task.target)) match {
       case success: ImplicitSearchSuccess =>
         createHandle(task, task.implicitKey, ImplicitIdentity, simpleGen = true, _ => success.tree)
 
       case failure: ImplicitSearchFailure =>
-        if (!task.isRoot && task.modifiers.contains(BuiltinModifiers.requireImplicit)) {
+        if (task.modifiers.contains(BuiltinModifiers.requireImplicit)) {
           report.errorAndAbort(formatMessage("@requireImplicit is present and no implicit candidate was found:\n\n" +
             failure.explanation, task, plugin = None))
         }

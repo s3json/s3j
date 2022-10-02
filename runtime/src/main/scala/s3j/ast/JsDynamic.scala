@@ -1,10 +1,14 @@
 package s3j.ast
 
-// '$' is used to avoid confusion with actual JSON contents when using common names like 'x', 'base', 'data' etc
+import s3j.format.JsonDecoder
+import s3j.io.AstJsonReader
+
+// '$' is used to avoid confusion with selectDynamic when picking JSON contents
 class JsDynamic(val $: JsValue) extends Selectable {
   // TODO: ParseException's for errors
 
-  // TODO: def as[T]
+  def convertTo[T](using d: JsonDecoder[T]): T = d.decode(new AstJsonReader($))
+  def as[T](using d: JsonDecoder[T]): T = d.decode(new AstJsonReader($))
 
   def selectDynamic(name: String): JsDynamic =
     $ match {

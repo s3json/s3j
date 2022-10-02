@@ -21,8 +21,9 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_
   private val _seenAnnotations: mutable.Set[String] = mutable.HashSet.empty
   private val _unparsedAnnotations: mutable.Set[String] = mutable.HashSet.empty
 
-  private case class AnnotationData(pos: Position, annotation: TypeRepr, typeArgs: List[TypeRepr],
-                                    args: List[Term]) { ann =>
+  protected case class AnnotationData(pos: Position, annotation: TypeRepr, typeArgs: List[TypeRepr], 
+                                      args: List[Term]) 
+  { ann =>
     val symbol: Symbol = annotation.typeSymbol
     val fullName: String = symbol.fullName
 
@@ -50,7 +51,7 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_
   }
 
   /** Split annotation application tree into annotation type and application arguments */
-  private def parseAnnotation(annot: Term): AnnotationData = annot match {
+  protected def parseAnnotation(annot: Term): AnnotationData = annot match {
     case Apply(Select(New(tpe), "<init>"), args) => AnnotationData(annot.pos, tpe.tpe, Nil, args)
     case Apply(TypeApply(Select(New(Applied(tpe, typeArgTrees)), "<init>"), _), args) =>
       val typeArgs = typeArgTrees.map {

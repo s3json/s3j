@@ -15,7 +15,6 @@ object CodeUtils {
       case '[ Float ]     => Expr(0.0F)
       case '[ Double ]    => Expr(0.0D)
       case '[ Unit ]      => '{ () }
-      case '[ Option[t] ] => '{ None }
       case _ => quotes.reflect.report.errorAndAbort("Unsupported type for placeholder: " + Type.show[T])
     }).asInstanceOf[Expr[T]]
 

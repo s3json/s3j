@@ -19,6 +19,9 @@ object ObjectFormatUtils {
 
   def throwUnknownKey(reader: JsonReader, key: String): Nothing =
     reader.parseError(s"Unknown key: '$key'")
+    
+  def throwDuplicateKey(reader: JsonReader, key: String): Nothing =
+    reader.parseError(s"Duplicated key: '$key'")
 
   def expectBeginObject(reader: JsonReader): JsonReader = {
     val t = reader.nextToken()

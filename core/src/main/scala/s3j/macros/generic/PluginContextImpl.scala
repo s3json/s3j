@@ -34,6 +34,9 @@ extends PluginContext with ModifierParserImpl with GenerationContextImpl with Ge
   val (generationMode: GenerationMode, _rootType: TypeRepr) = GenerationMode.decode(_generatedType)
   val generatedType: Type[T] = _rootType.asType.asInstanceOf[Type[T]]
   val typeSymbol: Symbol = _rootType.typeSymbol
+  
+  val inspectCode: Boolean = typeSymbol.annotations.map(parseAnnotation)
+    .exists(_.fullName == "s3j.annotations.inspectCode")
 
   private var _termCounter: Int = 0
 

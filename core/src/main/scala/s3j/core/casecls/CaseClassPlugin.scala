@@ -1,8 +1,8 @@
 package s3j.core.casecls
 
-import s3j.annotations.{allowUnknownKeys, failUnknownKeys, key, restFields}
-import s3j.core.casecls.impl.{CaseClassGenerator, PlainFieldExtension, RestFieldsExtension}
-import s3j.core.casecls.modifiers.{RestFieldsModifier, UnknownKeysModifier}
+import s3j.annotations.{allowUnknownKeys, failUnknownKeys, key, restFields, nullOption}
+import s3j.core.casecls.impl.{CaseClassGenerator, OptionExtension, PlainFieldExtension, RestFieldsExtension}
+import s3j.core.casecls.modifiers.{NullOptionModifier, RestFieldsModifier, UnknownKeysModifier}
 import s3j.macros.GenerationContext.{GenerationOutcome, GenerationUnsupported}
 import s3j.macros.generic.Extensions
 import s3j.macros.modifiers.{ModifierParser, ModifierSet}
@@ -15,13 +15,15 @@ class CaseClassPlugin extends Plugin {
 
   override def extensions: Extensions = Extensions(
     CaseClassExtension.key ~> new PlainFieldExtension,
-    CaseClassExtension.key ~> new RestFieldsExtension
+    CaseClassExtension.key ~> new RestFieldsExtension,
+    CaseClassExtension.key ~> new OptionExtension
   )
 
   override def modifierParser(using PluginContext): ModifierParser = ModifierParser.builder
     .parse[allowUnknownKeys](UnknownKeysModifier(true))
     .parse[failUnknownKeys](UnknownKeysModifier(false))
     .parse[restFields](RestFieldsModifier)
+    .parse[nullOption](NullOptionModifier)
     .build()
 
   override def generate[T](modifiers: ModifierSet)(using Quotes, GenerationContext, Type[T]): GenerationOutcome = {

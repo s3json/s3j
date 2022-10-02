@@ -3,6 +3,7 @@ package s3j.core.casecls.impl
 import s3j.core.casecls.CaseClassContext.*
 import s3j.core.casecls.{CaseClassContext, CaseClassExtension}
 import s3j.core.casecls.impl.CaseClassObjectBuilder.{FieldIdentity, ObjectIdentity, StackEntry}
+import s3j.core.casecls.modifiers.UnknownKeysModifier
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.GenerationContext
 import s3j.macros.PluginContext.ExtensionRegistration
@@ -24,7 +25,7 @@ private[casecls] object CaseClassObjectBuilder {
   }
 
   case class FieldIdentity(handledKeys: Set[String], dynamic: Boolean, field: AnyRef)
-  case class ObjectIdentity(fields: Set[FieldIdentity])
+  case class ObjectIdentity(unknownKeys: Boolean, fields: Set[FieldIdentity])
 }
 
 private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using c: GenerationContext, q: Quotes)
@@ -32,28 +33,36 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
   import q.reflect.*
 
   private val generatedType: TypeRepr = TypeRepr.of(using stack.head.t)
+  private val typeArgs: List[TypeRepr] = generatedType.typeArgs
   private val typeSymbol: Symbol = generatedType.typeSymbol
+  private val typeParams: List[Symbol] = typeSymbol.primaryConstructor.paramSymss.flatten.filter(_.isTypeParam)
   private val modifiers: ModifierSet = stack.head.modifiers
   private val reportingStackBase: Seq[ReportingBuilder.StackEntry] = outer.stack.map(_.toReporting).reverse.tail
+
+  if (typeArgs.size != typeParams.size) {
+    throw new IllegalArgumentException("Type parameters and arguments list differ in length for: " +
+      typeSymbol.fullName + " (" + generatedType.show + ")")
+  }
 
   private val report: ErrorReporting = c.reportBuilder
     .stackEntries(reportingStackBase:_*)
     .build()
 
-  private class FieldImpl(val field: Symbol, val listIndex: Int) {
-    val fieldType: TypeRepr = generatedType.memberType(field).simplified.dealias
-    val ownModifiers: ModifierSet = c.symbolModifiers(field).own
+  private class FieldImpl(val ctorField: Symbol, val listIndex: Int) {
+    val classField: Symbol = typeSymbol.fieldMember(ctorField.name)
+    val fieldType: TypeRepr = generatedType.memberType(ctorField).substituteTypes(typeParams, typeArgs).simplified.dealias
+    val ownModifiers: ModifierSet = c.symbolModifiers(ctorField).own
     val inheritedModifiers: ModifierSet = outer.modifiers ++ ownModifiers
 
-    val key: String = field.name // TODO: Case conventions, key overrides
+    val key: String = ctorField.name // TODO: Case conventions, key overrides
 
-    val reportPosition: Option[XPosition] = field.pos.map(XPosition.apply(_))
+    val reportPosition: Option[XPosition] = ctorField.pos.map(XPosition.apply(_))
     val reportingStack: Seq[ReportingBuilder.StackEntry] = reportingStackBase :+
-      ReportingBuilder.StackEntry(fieldType.asType, None, Seq(GenerationPath.ObjectField(field.name)))
+      ReportingBuilder.StackEntry(fieldType.asType, None, Seq(GenerationPath.ObjectField(ctorField.name)))
 
     type T
     val request: FieldRequest[T] =
-      FieldRequest[T](field.name, key, fieldType.asType.asInstanceOf[Type[T]], ownModifiers, stack.head.modifiers)
+      FieldRequest[T](ctorField.name, key, fieldType.asType.asInstanceOf[Type[T]], ownModifiers, stack.head.modifiers)
 
     @threadUnsafe
     lazy val report: ErrorReporting = c.reportBuilder
@@ -64,12 +73,13 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
     var result: ObjectField[T] = _
 
     override def toString: String =
-      s"{field='${field.name}', type='${fieldType.show}', modifiers=$inheritedModifiers, listIdx=$listIndex}"
+      s"{field='${ctorField.name}', type='${fieldType.show}', modifiers=$inheritedModifiers, listIdx=$listIndex}"
   }
 
   // Scan all fields to have plugins loaded before getting extensions
   private val fields: Seq[FieldImpl] = typeSymbol.primaryConstructor.paramSymss
-    .zipWithIndex.flatMap { case (xs, i) => xs.map(new FieldImpl(_, i)) }
+    .filterNot(_.forall(_.isTypeParam))
+    .zipWithIndex.flatMap { case (xs, i) => xs.filterNot(_.isTypeParam).map(new FieldImpl(_, i)) }
     .toVector
 
   private val extensions: Set[ExtensionRegistration[CaseClassExtension]] = c.extensions(CaseClassExtension.key)
@@ -173,19 +183,22 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
 
   private def checkConsistency(): Unit = {
     for ((k, vs) <- fields.flatMap(f => f.result.handledKeys.map(_ -> f)).groupMap(_._1)(_._2) if vs.size > 1) {
-      report.errorAndAbort(s"Multiple fields have conflicting key '$k': ${vs.map(_.field.name).mkString(", ")}")
+      report.errorAndAbort(s"Multiple fields have conflicting key '$k': ${vs.map(_.ctorField.name).mkString(", ")}")
     }
 
     if (fields.count(_.result.handlesDynamicKeys) > 1) {
       report.errorAndAbort(s"Multiple fields have dynamic field keys: " +
-        fields.filter(_.result.handlesDynamicKeys).map(_.field.name).mkString(", "))
+        fields.filter(_.result.handlesDynamicKeys).map(_.ctorField.name).mkString(", "))
     }
   }
 
   private def computeIdentity(): ObjectIdentity =
-    ObjectIdentity(fields.map { f =>
-      FieldIdentity(f.result.handledKeys, f.result.handlesDynamicKeys, f.result.identity)
-    }.toSet)
+    ObjectIdentity(
+      unknownKeys = stack.head.modifiers(UnknownKeysModifier.key).allow,
+      fields = fields
+        .map { f => FieldIdentity(f.result.handledKeys, f.result.handlesDynamicKeys, f.result.identity) }
+        .toSet
+    )
 
   // Restore previously flattened field list to List[List[X]]
   private def groupFields[T, R](fields: Seq[T])(listIndex: T => Int, result: T => R): List[List[R]] = {
@@ -229,8 +242,7 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
           import quotes.reflect.*
           import f.request.implicitType
 
-          val fieldSymbol = typeSymbol.fieldMember(f.field.name).asInstanceOf[Symbol]
-          val selectedField = Select(value.asTerm, fieldSymbol).asExprOf[f.T]
+          val selectedField = Select(value.asTerm, f.classField.asInstanceOf[Symbol]).asExprOf[f.T]
           f.result.generateEncoder(writer, selectedField)
         })
 
@@ -264,14 +276,20 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
 
           def decodeResult()(using Quotes): Expr[Any] = {
             import quotes.reflect.*
-            val baseTree: Term = Select(New(TypeIdent(typeSymbol.asInstanceOf[Symbol])),
-              typeSymbol.primaryConstructor.asInstanceOf[Symbol])
+            var resultType: TypeTree = TypeIdent(typeSymbol.asInstanceOf[Symbol])
 
-            val applied =
-              groupFields(outer.fields.zip(fieldCode))(_._1.listIndex, _._2.decodeResult())
-                .foldLeft(baseTree)((t, args) => Apply(t, args.map(_.asTerm)))
+            if (typeParams.nonEmpty) {
+              resultType = Applied(resultType, typeArgs.map(t => Inferred(t.asInstanceOf[TypeRepr])))
+            }
 
-            applied.asExpr
+            var result: Term = Select(New(resultType), typeSymbol.primaryConstructor.asInstanceOf[Symbol])
+            if (typeParams.nonEmpty) {
+              result = TypeApply(result, typeArgs.map(t => Inferred(t.asInstanceOf[TypeRepr])))
+            }
+
+            groupFields(outer.fields.zip(fieldCode))(_._1.listIndex, _._2.decodeResult())
+              .foldLeft(result)((t, args) => Apply(t, args.map(_.asTerm)))
+              .asExpr
           }
         }
     }
