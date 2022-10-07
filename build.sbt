@@ -1,10 +1,12 @@
 ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := "3.2.2-RC1-bin-20220927-731522a-NIGHTLY"
+ThisBuild / scalaVersion := "3.2.0"
 
 val commonSettings = Seq(
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.2.12" % Test
-  )
+  ),
+
+  Compile / scalacOptions ++= Seq("-Xcheck-macros"),
 )
 
 lazy val root = (project in file("."))

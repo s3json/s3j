@@ -90,15 +90,9 @@ object Variable {
 trait Variable[T] {
   /** @return Whether this variable is a constant ('val') */
   def const: Boolean
-  
-  /** @return Symbol for variable definition */
-  def symbol(using Quotes): quotes.reflect.Symbol
 
   /** @return Variable definition */
   def definition(using Quotes): quotes.reflect.ValDef
-
-  /** @return Initialization value for variable */
-  def init: Expr[T]
 
   /**
    * Read stored value.

@@ -49,10 +49,12 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
     for (s <- serializers) {
       if (s.recursiveWrapper) {
         val recursiveSym = s.variableType.typeSymbol
-        val init = Select(New(Inferred(s.variableType)), recursiveSym.primaryConstructor)
-        statements += ValDef(s.variableSymbol, Some(init))
+        val init = Apply(TypeApply(Select(New(Inferred(s.variableType)), recursiveSym.primaryConstructor),
+          List(Inferred(s.serializedType))), List())
+
+        statements += ValDef(s.variableSymbol, Some(init.changeOwner(s.variableSymbol)))
       } else {
-        statements += ValDef(s.variableSymbol, Some(s.definition))
+        statements += ValDef(s.variableSymbol, Some(s.definition /* should already have proper owner */))
       }
     }
 

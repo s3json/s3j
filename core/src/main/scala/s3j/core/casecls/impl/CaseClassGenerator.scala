@@ -53,7 +53,7 @@ private[casecls] class CaseClassGenerator[T](modifiers: ModifierSet)(using c: Ge
     val keyHash: Variable[Int] = Variable.create("keyHash")
     val keys: IndexedSeq[(String, Int)] = obj.result.handledKeys.toVector.map(s => (s, s.hashCode)).sortBy(_._2)
 
-    def generateNode(low: Int, high: Int): Expr[Unit] = {
+    def generateNode(low: Int, high: Int)(using Quotes): Expr[Unit] = {
       if (low == high) {
         val key = keys(low)._1
         val keyExpr = Expr(key)

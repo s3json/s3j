@@ -7,7 +7,7 @@ import s3j.macros.codegen.Position as XPosition
 import s3j.macros.{GenerationContext, PluginContext}
 import s3j.macros.modifiers.{BuiltinModifiers, ModifierSet}
 import s3j.macros.traits.{ErrorReporting, NestedBuilder, NestedResult, ReportingBuilder}
-import s3j.macros.utils.{GenerationPath, MacroUtils, ReportingUtils}
+import s3j.macros.utils.{ForbiddenMacroUtils, GenerationPath, MacroUtils, ReportingUtils}
 
 import java.io.{PrintWriter, StringWriter}
 import scala.util.control.NonFatal
@@ -216,6 +216,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
     _serializers.put(task.basicKey, ret)
     _serializers.put(key, ret)
 
+    ForbiddenMacroUtils.clearQuotesCache()
     ret.definition = gen((if (ret.recursiveWrapper) Symbol.spliceOwner else ret.variableSymbol).asQuotes)
 
     // Store order _after_ generation, so nested types will get lower order
