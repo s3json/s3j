@@ -16,18 +16,20 @@ object DecoderUtils {
 
   def skipValue(r: JsonReader): Unit = {
     var nesting = 0
-    var first = false
+    var continued = true
 
-    while (first || nesting > 0) {
-      first = false
+    while (continued || nesting > 0)
       r.nextToken() match {
         case JsonToken.TEndOfStream => r.parseError("End of stream while parsing value")
         case JsonToken.TArrayStart => nesting += 1
         case JsonToken.TObjectStart => nesting += 1
-        case JsonToken.TStructureEnd => nesting -= 1
-        case _ => /* skip */
+        case JsonToken.TStructureEnd => nesting -= 1; continued = false
+        case JsonToken.TStringContinued => continued = true
+        case JsonToken.TString => continued = false
+        case JsonToken.TNumberContinued => continued = true
+        case JsonToken.TNumber => continued = false
+        case _ => continued = false
       }
-    }
   }
 
   def decodeStringRaw(reader: JsonReader, maxLength: Int): String | Null = reader.nextToken() match {

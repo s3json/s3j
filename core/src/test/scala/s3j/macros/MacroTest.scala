@@ -28,6 +28,13 @@ class MacroTest extends AnyFlatSpec with Matchers {
     r.y.order shouldBe Seq("f1", "f2", "f3")
   }
 
+  it should "handle @allowUnknownKeys" in {
+    @allowUnknownKeys
+    case class Test(x: String) derives JsonFormat
+
+    "{\"x\":\"123\",\"y\":\"123123\",\"z\":\"123\",\"w\":{\"x\":123,\"y\":true}}".convertTo[Test] shouldBe Test("123")
+  }
+
   it should "serialize Option's" in {
     case class Test(x: String, y: Option[String]) derives JsonFormat
 
