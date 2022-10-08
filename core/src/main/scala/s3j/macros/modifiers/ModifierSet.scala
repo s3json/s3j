@@ -5,13 +5,24 @@ import scala.annotation.targetName
 object ModifierSet {
   /** Empty modifier set */
   val empty: ModifierSet = new ModifierSet(Map.empty)
-  
+
   /** Create new modifier set containing specified modifiers */
   def apply(xs: Modifier*): ModifierSet = new ModifierSet(xs.map(x => x.key -> x).toMap)
+
+  /** Compute inherited modifier set */
+  def inherit(parent: ModifierSet, own: ModifierSet): ModifierSet =
+    new ModifierSet(parent.items.filter(_._2.inheritable) ++ own.items)
+
+  /**
+   * Compute inherited modifier set from multiple parents. First element is a most distant parent, last element is an
+   * own modifier set for the target
+   */
+  def inherit(xs: ModifierSet*): ModifierSet =
+    xs.reduceLeft(ModifierSet.inherit)
 }
 
 /** Parsed modifier set */
-final class ModifierSet(private val items: Map[ModifierKey[_], Modifier]) {
+final class ModifierSet private(private val items: Map[ModifierKey[_], Modifier]) {
   /** @return true when this set contains a modifier with given key */
   def contains(key: ModifierKey[_]): Boolean = items.contains(key)
 

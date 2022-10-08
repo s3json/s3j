@@ -163,7 +163,11 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_
         .toVector
 
       val own = ModifierSet(modifiers:_*)
-      val inherited = parentModifiers.fold(own)(_.inherited ++ own)
+      val inherited = parentModifiers match {
+        case Some(parent) => ModifierSet.inherit(parent.inherited, own)
+        case None => own
+      }
+      
       val ret = ModifierData(sym, parentModifiers, own, inherited)
 
       _modifierCache.put(sym, ret)

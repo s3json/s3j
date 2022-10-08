@@ -8,4 +8,7 @@ object FieldKeyModifier {
 
 case class FieldKeyModifier(fieldKey: String) extends Modifier {
   def key: ModifierKey[_ <: Modifier] = FieldKeyModifier.key
+
+  /** Field keys are meant for a very specific field and therefore are not inheritable */
+  override def inheritable: Boolean = false
 }

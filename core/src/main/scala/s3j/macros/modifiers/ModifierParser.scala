@@ -27,18 +27,18 @@ object ModifierParser {
     def args: List[Expr[Any]]
   }
 
+  type ParseFunction = Quotes ?=> PartialFunction[StoredModifier, Modifier]
+
   /** Mutable class for convenient parser construction */
   trait ParserBuilder {
-    type ParseFunction = Quotes ?=> PartialFunction[StoredModifier, Modifier]
-
     /** Parse annotation of type `T` with user function */
-    def parse[T](parser: ParseFunction)(using QualifiedName[T]): ParserBuilder
+    def parseFn[T](parser: ParseFunction)(using QualifiedName[T]): ParserBuilder
 
     /** Parse annotation of type `T`, returning singleton modifier instance */
     def parse[T](modifier: Modifier)(using QualifiedName[T]): ParserBuilder
 
     /** Parse annotation of named type with user function */
-    def parse(name: String)(parser: ParseFunction): ParserBuilder
+    def parseFn(name: String)(parser: ParseFunction): ParserBuilder
 
     /** Parse annotation of named type, returning singleton modifier instance */
     def parse(name: String, modifier: Modifier): ParserBuilder

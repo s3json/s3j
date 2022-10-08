@@ -14,6 +14,7 @@ private[modifiers] object ParserBuilderImpl {
 }
 
 private[modifiers] class ParserBuilderImpl extends ParserBuilder {
+  import ModifierParser.ParseFunction
   private type LiftedFn = (Quotes, StoredModifier) => Option[Modifier]
   private val _parsers: mutable.Map[String, LiftedFn] = mutable.HashMap.empty
 
@@ -25,13 +26,13 @@ private[modifiers] class ParserBuilderImpl extends ParserBuilder {
 
   private def liftConstant(m: Modifier): LiftedFn = (_, _) => Some(m)
 
-  def parse[T](parser: ParseFunction)(using n: QualifiedName[T]): ParserBuilder =
+  def parseFn[T](parser: ParseFunction)(using n: QualifiedName[T]): ParserBuilder =
     parseInner(n.name, lift(parser))
 
   def parse[T](modifier: Modifier)(using n: QualifiedName[T]): ParserBuilder =
     parseInner(n.name, liftConstant(modifier))
 
-  def parse(name: String)(parser: ParseFunction): ParserBuilder =
+  def parseFn(name: String)(parser: ParseFunction): ParserBuilder =
     parseInner(name, lift(parser))
 
   def parse(name: String, modifier: Modifier): ParserBuilder =

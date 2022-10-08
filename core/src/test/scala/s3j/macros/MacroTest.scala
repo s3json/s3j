@@ -3,6 +3,7 @@ package s3j.macros
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import s3j.annotations.*
+import s3j.annotations.naming.{capitalizedKebabCase, screamingSnakeCase, snakeCase}
 import s3j.ast.JsObject
 import s3j.{*, given}
 
@@ -58,5 +59,26 @@ class MacroTest extends AnyFlatSpec with Matchers {
 
     "{\"a\":{\"x\":\"qwe\"},\"b\":{\"x\":{\"x\":\"asd\"}}}".convertTo[Test6] shouldBe
       Test6(Test6A("qwe"), Test6A(Test6A("asd")))
+  }
+
+  it should "recognize annotations for object keys" in {
+    case class Test7(@key("mew") x: String, @snakeCase meowOink: String, @capitalizedKebabCase barkHonk: String)
+    derives JsonFormat
+
+    Test7("123", "456", "789").toJsonString shouldBe "{\"mew\":\"123\",\"meow_oink\":\"456\",\"Bark-Honk\":\"789\"}"
+    "{\"mew\":\"XXX\",\"meow_oink\":\"YYY\",\"Bark-Honk\":\"ZZZ\"}".convertTo[Test7] shouldBe Test7("XXX", "YYY", "ZZZ")
+  }
+
+  it should "recognize global annotations for case convention" in {
+    @screamingSnakeCase
+    object Test {
+      case class Test8A(someKey: String)
+      case class Test8(meowOink: String, barkHonk: Test8A) derives JsonFormat
+    }
+
+    import Test.*
+
+    Test8("123", Test8A("xyz")).toJsonString shouldBe "{\"MEOW_OINK\":\"123\",\"BARK_HONK\":{\"SOME_KEY\":\"xyz\"}}"
+    "{\"MEOW_OINK\":\"A\",\"BARK_HONK\":{\"SOME_KEY\":\"B\"}}".convertTo[Test8] shouldBe Test8("A", Test8A("B"))
   }
 }

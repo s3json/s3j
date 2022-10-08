@@ -1,9 +1,10 @@
 package s3j.core.casecls.impl
 
+import s3j.annotations.naming.CaseConvention
 import s3j.core.casecls.CaseClassContext.*
 import s3j.core.casecls.{CaseClassContext, CaseClassExtension}
 import s3j.core.casecls.impl.CaseClassObjectBuilder.{FieldIdentity, ObjectIdentity, StackEntry}
-import s3j.core.casecls.modifiers.UnknownKeysModifier
+import s3j.core.casecls.modifiers.{FieldCaseModifier, FieldKeyModifier, UnknownKeysModifier}
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.GenerationContext
 import s3j.macros.PluginContext.ExtensionRegistration
@@ -52,9 +53,19 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
     val classField: Symbol = typeSymbol.fieldMember(ctorField.name)
     val fieldType: TypeRepr = generatedType.memberType(ctorField).substituteTypes(typeParams, typeArgs).simplified.dealias
     val ownModifiers: ModifierSet = c.symbolModifiers(ctorField).own
-    val inheritedModifiers: ModifierSet = outer.modifiers ++ ownModifiers
+    val inheritedModifiers: ModifierSet = ModifierSet.inherit(outer.modifiers, ownModifiers)
 
-    val key: String = ctorField.name // TODO: Case conventions, key overrides
+    /**
+     * N.B.: This key is only an initial suggested key for the field! Extensions which are responsible for actual code
+     * generation may either use this key as-is, modify it in some way, or completely ignore it!
+     *
+     * Use [[result.handledKeys]] and [[result.handlesDynamicKeys]] to query actual keys for this field.
+     */
+    val baseKey: String =
+      ownModifiers.get(FieldKeyModifier.key).map(_.fieldKey).getOrElse {
+        val caseConv = inheritedModifiers.get(FieldCaseModifier.key).fold(CaseConvention.NoConvention)(_.value)
+        CaseConvention.transform(caseConv, ctorField.name)
+      }
 
     val reportPosition: Option[XPosition] = ctorField.pos.map(XPosition.apply(_))
     val reportingStack: Seq[ReportingBuilder.StackEntry] = reportingStackBase :+
@@ -62,7 +73,7 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
 
     type T
     val request: FieldRequest[T] =
-      FieldRequest[T](ctorField.name, key, fieldType.asType.asInstanceOf[Type[T]], ownModifiers, stack.head.modifiers)
+      FieldRequest[T](ctorField.name, baseKey, fieldType.asType.asInstanceOf[Type[T]], ownModifiers, stack.head.modifiers)
 
     @threadUnsafe
     lazy val report: ErrorReporting = c.reportBuilder
