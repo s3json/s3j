@@ -1,5 +1,9 @@
 package s3j.macros.codegen
 
+import s3j.io.{JsonReader, JsonWriter}
+import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat}
+import s3j.macros.generic.GenerationMode
+
 import scala.quoted.*
 
 object CodeUtils {
@@ -52,5 +56,65 @@ object CodeUtils {
     }
 
     Block(ret.result(), finalResult).asExprOf[T]
+  }
+
+  /** Build a codec object using generation mode and provided parts */
+  def makeCodec[T](mode: GenerationMode)(
+    encoder: Quotes ?=> (writer: Expr[JsonWriter], value: Expr[T]) => Expr[Any],
+    decoder: Quotes ?=> (reader: Expr[JsonReader]) => Expr[T]
+  )(using Quotes, Type[T]): Expr[Any] = mode match {
+    case GenerationMode.Decoder => '{
+      new JsonDecoder[T] {
+        def decode(reader: JsonReader): T = ${ decoder('reader) }
+      }
+    }
+
+    case GenerationMode.Encoder => '{
+      new JsonEncoder[T] {
+        def encode(writer: JsonWriter, value: T): Unit = ${ encoder('writer, 'value) }
+      }
+    }
+
+    case GenerationMode.Format => '{
+      new JsonFormat[T] {
+        def decode(reader: JsonReader): T = ${ decoder('reader) }
+        def encode(writer: JsonWriter, value: T): Unit = ${ encoder('writer, 'value) }
+      }
+    }
+  }
+
+  /** Build a hash-code based string match code */
+  def matchString[T](cases: Iterable[T])(
+    caseHash: T => Int,
+    inputHash: Expr[Int],
+    caseEquals: Quotes ?=> T => Expr[Boolean],
+    caseCode: Quotes ?=> T => Expr[Any],
+    fallbackCode: Quotes ?=> Expr[Any]
+  )(using Quotes, NameGenerator): Expr[Any] = {
+    val matched: Variable[Boolean] = Variable.create("matched")('{ false })
+    val sortedCases = cases.toVector.sortBy(caseHash)
+
+    def generateNode(low: Int, high: Int)(using Quotes): Expr[Unit] = {
+      if (low == high) {
+        '{
+          if (${ caseEquals(sortedCases(low)) }) {
+            ${ matched := Expr(true) }
+            ${ caseCode(sortedCases(low)) }
+          }
+        }
+      } else if (low + 1 == high) {
+        val splitHash = caseHash(sortedCases(high))
+        '{ if ($inputHash < ${ Expr(splitHash) }) ${generateNode(low, low)} else ${generateNode(high, high)} }
+      } else {
+        val mid = (low + high) / 2
+        val splitHash = caseHash(sortedCases(mid))
+        '{ if ($inputHash < ${ Expr(splitHash) }) ${generateNode(low, mid - 1)} else ${generateNode(mid, high)} }
+      }
+    }
+
+    Variable.defineVariables(Seq(matched), '{
+      ${ generateNode(0, cases.size - 1) }
+      if (!$matched) ${ fallbackCode }
+    })
   }
 }

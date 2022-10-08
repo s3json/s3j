@@ -1,6 +1,7 @@
 package s3j.macros
 
 import s3j.core.casecls.CaseClassPlugin
+import s3j.core.enums.EnumerationPlugin
 import s3j.macros.generic.{BuiltinsPlugin, PluginContextImpl}
 
 import java.util.Base64
@@ -18,6 +19,7 @@ object JsonMacros {
     // Load builtin plugins:
     ctx.loadPlugin[BuiltinsPlugin]()
     ctx.loadPlugin[CaseClassPlugin]()
+    ctx.loadPlugin[EnumerationPlugin]()
 
     val effectiveModifiers = ctx.symbolModifiers(ctx.typeSymbol).inherited ++
       ctx.symbolModifiers(Symbol.spliceOwner).own

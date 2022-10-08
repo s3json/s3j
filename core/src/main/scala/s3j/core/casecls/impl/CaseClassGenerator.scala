@@ -7,7 +7,7 @@ import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat, util}
 import s3j.io.{JsonReader, JsonToken, JsonWriter, KeyHandle}
 import s3j.macros.GenerationContext
 import s3j.macros.GenerationContext.GenerationCandidate
-import s3j.macros.codegen.Variable
+import s3j.macros.codegen.{CodeUtils, Variable}
 import s3j.macros.generic.GenerationMode
 import s3j.macros.modifiers.ModifierSet
 
@@ -48,44 +48,31 @@ private[casecls] class CaseClassGenerator[T](modifiers: ModifierSet)(using c: Ge
   private def generateDecodingLoop(reader: Expr[JsonReader], decoder: DecodingCode, keyTracker: KeyPresenceTracker)
                                   (using Quotes, DecodingEnvironment): Expr[Unit] =
   {
-    val keyFound: Variable[Boolean] = Variable.create("keyFound")
     val keyHandle: Variable[KeyHandle] = Variable.create("key")
     val keyHash: Variable[Int] = Variable.create("keyHash")
-    val keys: IndexedSeq[(String, Int)] = obj.result.handledKeys.toVector.map(s => (s, s.hashCode)).sortBy(_._2)
 
-    def generateNode(low: Int, high: Int)(using Quotes): Expr[Unit] = {
-      if (low == high) {
-        val key = keys(low)._1
-        val keyExpr = Expr(key)
-        '{
-          if ($keyHandle.stringEquals($keyExpr)) {
-            if (${ keyTracker.isKeyPresent(key) }) ObjectFormatUtils.throwDuplicateKey($reader, $keyExpr)
-            ${ keyFound := Expr(true) }
-            ${ keyTracker.markKeyPresence(key) }
-            ${ decoder.decodeKey(key, reader) }
-          }
-        }
-      } else if (low + 1 == high) {
-        val splitHash = keys(high)._2
-        '{ if ($keyHash < ${ Expr(splitHash) }) ${generateNode(low, low)} else ${generateNode(high, high)} }
-      } else {
-        val mid = (low + high) / 2
-        val splitHash = keys(mid)._2
-        '{ if ($keyHash < ${ Expr(splitHash) }) ${generateNode(low, mid - 1)} else ${generateNode(mid, high)} }
-      }
-    }
-
-    Variable.defineVariables(Seq(keyFound, keyHandle, keyHash), '{
-      while ($reader.peekToken == JsonToken.TKey) {
-        ${ keyFound := Expr(false) }
-        ${ keyHandle := '{ $reader.key } }
-        ${ keyHash := '{ $keyHandle.stringHashCode } }
-        $reader.nextToken()
-        ${ generateNode(0, keys.size - 1) }
-        if (!$keyFound) {
+    def matchKeys(using Quotes): Expr[Any] =
+      CodeUtils.matchString(obj.result.handledKeys)(
+        caseHash = _.hashCode,
+        inputHash = keyHash,
+        caseEquals = key => '{ $keyHandle.stringEquals(${ Expr(key) }) },
+        caseCode = key => '{
+          if (${keyTracker.isKeyPresent(key)}) ObjectFormatUtils.throwDuplicateKey($reader, ${ Expr(key) })
+          ${ keyTracker.markKeyPresence(key) }
+          ${ decoder.decodeKey(key, reader) }
+        },
+        fallbackCode = '{
           val keyString: String = $keyHandle.toString
           ${ generateUnknownKey(reader, decoder, 'keyString) }
         }
+      )
+
+    Variable.defineVariables(Seq(keyHandle, keyHash), '{
+      while ($reader.peekToken == JsonToken.TKey) {
+        ${ keyHandle := '{ $reader.key } }
+        ${ keyHash := '{ $keyHandle.stringHashCode } }
+        $reader.nextToken()
+        ${ matchKeys }
       }
     })
   }
@@ -117,25 +104,10 @@ private[casecls] class CaseClassGenerator[T](modifiers: ModifierSet)(using c: Ge
       def identity: AnyRef = obj.result.identity
 
       // Quasiquotes were much better than _this_:
-      def generate(using q: Quotes)(): Expr[Any] = c.generationMode match {
-        case GenerationMode.Decoder => '{
-          new JsonDecoder[T] {
-            def decode(reader: JsonReader): T = ${ generateDecoder('reader) }
-          }
-        }
-
-        case GenerationMode.Encoder => '{
-          new JsonEncoder[T] {
-            def encode(writer: JsonWriter, value: T): Unit = ${ generateEncoder('writer, 'value) }
-          }
-        }
-
-        case GenerationMode.Format => '{
-          new JsonFormat[T] {
-            def decode(reader: JsonReader): T = ${ generateDecoder('reader) }
-            def encode(writer: JsonWriter, value: T): Unit = ${ generateEncoder('writer, 'value) }
-          }
-        }
-      }
+      def generate(using q: Quotes)(): Expr[Any] =
+        CodeUtils.makeCodec(c.generationMode)(
+          encoder = generateEncoder _,
+          decoder = generateDecoder _
+        )
     }
 }
