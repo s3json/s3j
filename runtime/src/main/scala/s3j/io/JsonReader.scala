@@ -18,8 +18,14 @@ object JsonReader {
      */  
     def readEnclosingValue(): JsValue
     
+    /** Get enclosing value without consuming it */
+    def enclosingValue: JsValue
+    
     /** @return Next value (i.e. value that will be output via token stream) */
     def readValue(): JsValue
+
+    /** Keys in current enclosing value which are not yet consumed, in stream order */
+    def remainingKeys: Seq[String]
   }
 }
 

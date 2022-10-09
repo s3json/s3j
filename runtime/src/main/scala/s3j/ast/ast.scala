@@ -20,6 +20,7 @@ object JsValue {
 sealed trait JsValue {
   def isObject: Boolean = this.isInstanceOf[JsObject]
   def isArray: Boolean = this.isInstanceOf[JsArray]
+  def typeName: String
 
   def asObject: JsObject = this.asInstanceOf[JsObject]
   def asArray: JsArray = this.asInstanceOf[JsArray]
@@ -32,7 +33,9 @@ sealed trait JsValue {
   override def toString: String = this.toJsonString
 }
 
-case object JsNull extends JsValue
+case object JsNull extends JsValue {
+  def typeName: String = "null"
+}
 
 object JsBoolean {
   export TreeBoxing.{jsBooleanBox, jsBooleanUnbox}
@@ -46,7 +49,9 @@ object JsBoolean {
 }
 
 /** Boolean JSON AST node. */
-final case class JsBoolean(value: Boolean) extends JsValue
+final case class JsBoolean(value: Boolean) extends JsValue {
+  def typeName: String = "boolean"
+}
 
 object JsNumber {
   export TreeBoxing.{jsNumberBoxInt, jsNumberBoxLong, jsNumberBoxFloat, jsNumberBoxDouble, jsNumberBoxBigInt,
@@ -66,6 +71,8 @@ object JsNumber {
  * merely a sealed trait. `toXXX` methods could be used for convenient access.
  */
 sealed trait JsNumber extends JsValue {
+  def typeName: String = "number"
+  
   def toInt: Int
   def toLong: Long
   def toFloat: Float
@@ -221,7 +228,9 @@ object JsString {
 }
 
 /** String JSON AST node */
-final case class JsString(value: String) extends JsValue
+final case class JsString(value: String) extends JsValue {
+  def typeName: String = "string"
+}
 
 /** Array JSON AST node */
 object JsArray {
@@ -229,6 +238,7 @@ object JsArray {
 }
 
 final class JsArray(val value: Seq[JsValue]) extends JsValue {
+  def typeName: String = "array"
   def apply(i: Int): JsValue = value(i)
   def foreach[U](f: JsValue => U): Unit = value.foreach(f)
   def iterator: Iterator[JsValue] = value.iterator
@@ -258,6 +268,8 @@ object JsObject {
  * spurious exceptions).
  */
 final class JsObject(val items: Map[String, JsValue], val order: Seq[String] = Nil) extends JsValue {
+  def typeName: String = "object"
+  
   /** Iterate contents of this object. Iteration respects key ordering */
   def foreach[U](f: ((String, JsValue)) => U): Unit = {
     if (order.isEmpty) items.foreach(f)
@@ -273,6 +285,12 @@ final class JsObject(val items: Map[String, JsValue], val order: Seq[String] = N
   def has(key: String): Boolean = items.contains(key)
   def get(key: String): Option[JsValue] = items.get(key)
   def apply(key: String): JsValue = items(key)
+
+  /** Create subset of object with only specific keys preserved */
+  def subObject(keys: Seq[String]): JsObject = {
+    val keySet = keys.toSet
+    new JsObject(items.filter(i => keySet(i._1)), keys)
+  }
 
   /** Add new key-value pair to the end of this object */
   @targetName("add")

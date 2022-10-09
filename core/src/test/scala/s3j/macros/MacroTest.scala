@@ -127,4 +127,114 @@ class MacroTest extends AnyFlatSpec with Matchers {
     "\"bark!honk\"".convertTo[Test] shouldBe Test.BarkHonk
     "\"Quack-Quack\"".convertTo[Test] shouldBe Test.QuackQuack
   }
+
+  it should "serialize parametrized enums" in {
+    enum Test derives JsonFormat {
+      case A(x: String)
+      case B(y: String, z: String)
+      case C
+    }
+
+    Test.A("123").toJsonString shouldBe "{\"type\":\"A\",\"x\":\"123\"}"
+    Test.B("x", "y").toJsonString shouldBe "{\"type\":\"B\",\"y\":\"x\",\"z\":\"y\"}"
+    Test.C.toJsonString shouldBe "{\"type\":\"C\"}"
+
+    "{\"type\":\"A\",\"x\":\"xx\"}".convertTo[Test] shouldBe Test.A("xx")
+    "{\"type\":\"B\",\"y\":\"1\",\"z\":\"2\"}".convertTo[Test] shouldBe Test.B("1", "2")
+    "{\"type\":\"C\"}".convertTo[Test] shouldBe Test.C
+  }
+
+  it should "fail on out-of-order discriminator if no @allowBuffering is set" in {
+    enum Test derives JsonFormat {
+      case A(x: String)
+      case B
+    }
+
+    "{\"type\":\"A\",\"x\":\"1\"}".convertTo[Test] shouldBe Test.A("1")
+
+    a [ParseException] shouldBe thrownBy {
+      "{\"x\":\"1\",\"type\":\"A\"}".convertTo[Test]
+    }
+  }
+
+  it should "work with out-of-order discriminator if @allowBuffering is set" in {
+    @allowBuffering
+    enum Test derives JsonFormat {
+      case A(x: String)
+      case B
+    }
+
+    "{\"x\":\"1\",\"type\":\"A\"}".convertTo[Test] shouldBe Test.A("1")
+  }
+
+  it should "fail on extra fields in singleton enum cases" in {
+    enum Test derives JsonFormat {
+      case A
+      case B(x: String) // to force objects
+    }
+
+    "{\"type\":\"A\"}".convertTo[Test] shouldBe Test.A
+
+    a [ParseException] shouldBe thrownBy {
+      "{\"type\":\"A\",\"x\":\"1\"}".convertTo[Test]
+    }
+  }
+
+  it should "allow extra fields in singleton enum cases with @allowUnknownKeys" in {
+    @allowUnknownKeys
+    enum Test derives JsonFormat {
+      case A
+      case B(x: String) // to force objects
+    }
+
+    "{\"type\":\"A\"}".convertTo[Test] shouldBe Test.A
+    "{\"type\":\"A\",\"x\":\"1\"}".convertTo[Test]
+  }
+
+  it should "respect @stringyCases annotation" in {
+    @stringyCases
+    enum Test derives JsonFormat {
+      case A
+      case B(x: String)
+    }
+
+    Test.A.toJsonString shouldBe "\"A\""
+  }
+
+  it should "respect @objectEnum annotation" in {
+    @objectEnum
+    enum Test derives JsonFormat {
+      case A
+    }
+
+    Test.A.toJsonString shouldBe "{\"type\":\"A\"}"
+  }
+
+  it should "respect @discriminator and @discriminatorField annotation" in {
+    @discriminatorField("mew")
+    enum Test derives JsonFormat {
+      case A(x: String)
+
+      @discriminator("X")
+      case B
+    }
+
+    Test.A("123").toJsonString shouldBe "{\"mew\":\"A\",\"x\":\"123\"}"
+    "{\"mew\":\"A\",\"x\":\"X\"}".convertTo[Test] shouldBe Test.A("X")
+
+    Test.B.toJsonString shouldBe "{\"mew\":\"X\"}"
+    "{\"mew\":\"X\"}".convertTo[Test] shouldBe Test.B
+  }
+
+  it should "generate generic sealed hierarchies" in {
+    sealed trait Test derives JsonFormat
+    case class TestA(x: String) extends Test
+    case class TestB(y: String) extends Test
+
+    TestA("1").toJsonString shouldBe "{\"type\":\"TestA\",\"x\":\"1\"}"
+    TestB("2").toJsonString shouldBe "{\"type\":\"TestB\",\"y\":\"2\"}"
+
+    "{\"type\":\"TestA\",\"x\":\"X\"}".convertTo[Test] shouldBe TestA("X")
+    "{\"type\":\"TestB\",\"y\":\"Y\"}".convertTo[Test] shouldBe TestB("Y")
+  }
 }

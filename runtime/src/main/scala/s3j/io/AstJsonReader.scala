@@ -12,7 +12,8 @@ private[io] object AstJsonReader {
   final val NNumber   = 3
 }
 
-class AstJsonReader(node: JsValue, chunkLength: Int = 1024) extends JsonReader with JsonReader.Buffered {
+class AstJsonReader(node: JsValue, locationPrefix: JsPath = JsPath.Root, chunkLength: Int = 1024)
+extends JsonReader with JsonReader.Buffered {
   import AstJsonReader._
 
   private class StackEntry(val node: JsValue) {
@@ -24,7 +25,7 @@ class AstJsonReader(node: JsValue, chunkLength: Int = 1024) extends JsonReader w
       case _ => throw new RuntimeException("StackEntry with unsupported node type: " + node.getClass)
     }
 
-    val keysIterator: Iterator[String] = node match {
+    var keysIterator: Iterator[String] = node match {
       case obj: JsObject => obj.keysIterator
       case _ => null
     }
@@ -104,11 +105,13 @@ class AstJsonReader(node: JsValue, chunkLength: Int = 1024) extends JsonReader w
 
       case _: JsString =>
         pushState(value)
-        if (refillRange()) JsonToken.TStringContinued else JsonToken.TString
+        if (refillRange()) JsonToken.TStringContinued
+        else { popState(); JsonToken.TString }
 
       case _: JsNumber =>
         pushState(value)
-        if (refillRange()) JsonToken.TNumberContinued else JsonToken.TNumber
+        if (refillRange()) JsonToken.TNumberContinued
+        else { popState(); JsonToken.TNumber }
     }
 
   /** @return Next token from the stream */
@@ -149,13 +152,18 @@ class AstJsonReader(node: JsValue, chunkLength: Int = 1024) extends JsonReader w
         state.currentIndex += 1
         emitValue(state.arrayIterator.next())
 
-      case NString => if (refillRange()) JsonToken.TStringContinued else JsonToken.TString
-      case NNumber => if (refillRange()) JsonToken.TNumberContinued else JsonToken.TNumber
+      case NString =>
+        if (refillRange()) JsonToken.TStringContinued
+        else { popState(); JsonToken.TString }
+
+      case NNumber =>
+        if (refillRange()) JsonToken.TNumberContinued
+        else { popState(); JsonToken.TNumber }
     }
   }
 
   def location: JsonLocation = {
-    val path = (state :: states).reverse.foldLeft(JsPath.Root: JsPath) {
+    val path = (state :: states).reverse.foldLeft(locationPrefix) {
       case (p, e) if e.nodeType == NObject => JsPath.Object(p, e.currentKey)
       case (p, e) if e.nodeType == NArray => JsPath.Array(p, e.currentIndex)
       case (p, _) => p
@@ -164,16 +172,16 @@ class AstJsonReader(node: JsValue, chunkLength: Int = 1024) extends JsonReader w
     JsonLocation.TreeLocation(path)
   }
 
+  def enclosingValue: JsValue = {
+    if (state == null || isCompleted) {
+      throw new IllegalStateException("No enclosing value is currently present")
+    }
+
+    state.node
+  }
+
   def readEnclosingValue(): JsValue = {
-    if (state == null) {
-      return node
-    }
-
-    if (isCompleted) {
-      throw new IllegalStateException("readEnclosingValue() at the end of stream")
-    }
-
-    val r = state.node
+    val r = enclosingValue
     popState()
     /* return */ r
   }
@@ -206,5 +214,20 @@ class AstJsonReader(node: JsValue, chunkLength: Int = 1024) extends JsonReader w
       case NString => throw new IllegalStateException("readValue() inside of string; use readEnclosingValue()")
       case NNumber => throw new IllegalStateException("readValue() inside of number; use readEnclosingValue()")
     }
+  }
+
+  def remainingKeys: Seq[String] = {
+    if (state == null || isCompleted) {
+      throw new IllegalStateException("No enclosing value is currently present")
+    }
+
+    if (state.nodeType != NObject) {
+      throw new IllegalStateException("remainingKeys when not in object node")
+    }
+
+    val result = state.keysIterator.toVector
+    state.keysIterator = result.iterator // recover consumed iterator
+
+    result
   }
 }

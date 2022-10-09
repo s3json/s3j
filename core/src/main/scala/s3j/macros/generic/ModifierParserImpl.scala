@@ -137,6 +137,7 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_
 
       val context: ModifierContext = // TODO
         if (sym.flags.is(Flags.Enum)) ModifierContext.Enum
+        else if (sym.isClassDef && sym.flags.is(Flags.Trait) && sym.flags.is(Flags.Sealed)) ModifierContext.Enum
         else ModifierContext.Generic
 
       val modifiers: Seq[Modifier] = parsed
