@@ -5,7 +5,6 @@ import s3j.core.casecls.{CaseClassContext, CaseClassExtension}
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.codegen.Variable
 import s3j.macros.traits.NestedResult
-import s3j.macros.utils.VarHandle
 
 import scala.annotation.threadUnsafe
 import scala.quoted.{Expr, Quotes, Type}

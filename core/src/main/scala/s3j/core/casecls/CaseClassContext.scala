@@ -6,7 +6,7 @@ import s3j.macros.GenerationContext
 import s3j.macros.codegen.{NameGenerator, Variable}
 import s3j.macros.modifiers.ModifierSet
 import s3j.macros.traits.{BasicPluginContext, NestedBuilder}
-import s3j.macros.utils.{GenerationPath, VariableHelper}
+import s3j.macros.utils.{GenerationPath}
 
 import scala.quoted.{Expr, Quotes, Type}
 
