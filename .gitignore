@@ -5,3 +5,4 @@ core/target
 runtime/target
 target/
 workdir/
+publish.sbt

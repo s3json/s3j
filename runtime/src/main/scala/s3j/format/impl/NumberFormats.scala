@@ -7,12 +7,12 @@ import s3j.io.{JsonReader, JsonToken, JsonWriter}
 import scala.collection.mutable
 
 object NumberFormats {
-  /** @return Number from JSON stream, presented as string */
-  def readNumberString(reader: JsonReader, maxLength: Int, errorMessage: String): String =
+  /** @return Number from JSON stream, presented as string, or `null` on length exhaustion */
+  def readNumberStringRaw(reader: JsonReader, maxLength: Int): String | Null =
     reader.nextToken() match {
       case JsonToken.TNumber =>
-        if (reader.chunk.remaining > maxLength) reader.parseError(errorMessage)
-        reader.chunk.toString
+        if (reader.chunk.remaining > maxLength) null
+        else reader.chunk.toString
 
       case JsonToken.TNumberContinued =>
         val sb = new mutable.StringBuilder()
@@ -23,13 +23,20 @@ object NumberFormats {
           token = reader.nextToken()
           reader.chunk.appendTo(sb)
 
-          if (sb.length > maxLength) reader.parseError(errorMessage)
+          if (sb.length > maxLength) return null
         }
 
         sb.result()
 
       case other => DecoderUtils.throwUnexpected(reader, "a number", other)
     }
+
+  /** @return Number from JSON stream, presented as string */
+  def readNumberString(reader: JsonReader, maxLength: Int, errorMessage: String): String = {
+    val r = readNumberStringRaw(reader, maxLength)
+    if (r == null) reader.parseError(errorMessage)
+    else r
+  }
 
   private def parseLong(reader: JsonReader, s: String, unsigned: Boolean): Long =
     try {
@@ -183,6 +190,39 @@ object NumberFormats {
     override def toString: String = "doubleFormat"
   }
 
-  // TODO: BigInt
-  // TODO: BigDec
+  /** @return [[JsonFormat]] instance for [[BigInt]]s with number length limit */
+  def bigIntFormat(maxLength: Int): JsonFormat[BigInt] =
+    new JsonFormat[BigInt] {
+      def encode(writer: JsonWriter, value: BigInt): Unit = writer.bigintValue(value)
+      def decode(reader: JsonReader): BigInt = {
+        val s = readNumberStringRaw(reader, maxLength)
+        if (s == null) reader.parseError("number is too long, maximum allowed " + maxLength + " digits")
+        else BigInt(s)
+      }
+
+      override def toString: String = s"BigIntFormat(maxLength=$maxLength)"
+    }
+
+  /** @return [[JsonFormat]] instance for [[BigDecimal]]s with number length and scale limit */
+  def bigDecFormat(maxLength: Int, maxScale: Int): JsonFormat[BigDecimal] =
+    new JsonFormat[BigDecimal] {
+      def encode(writer: JsonWriter, value: BigDecimal): Unit = writer.bigdecValue(value)
+      def decode(reader: JsonReader): BigDecimal = {
+        val s = readNumberStringRaw(reader, maxLength)
+        if (s == null) reader.parseError("number is too long, maximum allowed " + maxLength + " digits")
+        else {
+          val d = BigDecimal(s)
+          if (math.abs(d.scale) > maxScale) reader.parseError("number scale is out of range: maximum is " + maxScale)
+          else d
+        }
+      }
+
+      override def toString: String = s"BigDecFormat(maxLength=$maxLength, maxScale=$maxScale)"
+    }
+
+  /** Default [[BigInt]] format instance with maximum length of 1024 digits */
+  given bigIntFormat: JsonFormat[BigInt] = bigIntFormat(1024)
+
+  /** Default [[BigDecimal]] format instance with maximum length of 1024 digits and maximum scale of 8192 */
+  given bigDecFormat: JsonFormat[BigDecimal] = bigDecFormat(1024, 8192)
 }

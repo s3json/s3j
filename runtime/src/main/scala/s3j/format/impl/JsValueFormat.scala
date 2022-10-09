@@ -6,7 +6,7 @@ import s3j.io.{JsonReader, JsonWriter, JsonToken}
 
 import scala.collection.mutable
 
-class JsValueFormat extends JsonFormat[JsValue] {
+object JsValueFormat extends JsonFormat[JsValue] {
   private def readString(reader: JsonReader, continuation: Int, lengthLimit: Int): String = {
     val sb = new mutable.StringBuilder()
     var length = reader.chunk.remaining
@@ -28,7 +28,7 @@ class JsValueFormat extends JsonFormat[JsValue] {
 
   private def readNumber(s: String): JsNumber = JsBigDecimal(BigDecimal(s))
 
-  private def decodeStream(reader: JsonReader): JsValue = reader.nextToken() match {
+  def decodeStream(reader: JsonReader): JsValue = reader.nextToken() match {
     case JsonToken.TEndOfStream => reader.parseError("Unexpected end of stream")
     case JsonToken.TObjectStart =>
       val items = Map.newBuilder[String, JsValue]
