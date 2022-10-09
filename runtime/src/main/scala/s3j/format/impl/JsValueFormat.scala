@@ -73,16 +73,16 @@ class JsValueFormat extends JsonFormat[JsValue] {
 
   def encode(writer: JsonWriter, value: JsValue): Unit = value match {
     case JsNull           => writer.nullValue()
-    case JsBoolean(value) => writer.value(value)
-    case JsString(value)  => writer.value(value)
+    case JsBoolean(value) => writer.boolValue(value)
+    case JsString(value)  => writer.stringValue(value)
 
     case number: JsNumber => number match {
-      case JsInt(value)         => writer.value(value)
-      case JsLong(value)        => writer.value(value)
-      case JsFloat(value)       => writer.value(value)
-      case JsDouble(value)      => writer.value(value)
-      case JsBigInt(value)      => writer.value(value)
-      case JsBigDecimal(value)  => writer.value(value)
+      case JsInt(value)         => writer.longValue(value)
+      case JsLong(value)        => writer.longValue(value)
+      case JsFloat(value)       => writer.doubleValue(value)
+      case JsDouble(value)      => writer.doubleValue(value)
+      case JsBigInt(value)      => writer.bigintValue(value)
+      case JsBigDecimal(value)  => writer.bigdecValue(value)
     }
 
     case array: JsArray =>
@@ -95,4 +95,6 @@ class JsValueFormat extends JsonFormat[JsValue] {
       for (k <- obj.keysIterator) encode(writer.key(k), obj(k))
       writer.end()
   }
+  
+  override def toString: String = "JsValueFormat"
 }

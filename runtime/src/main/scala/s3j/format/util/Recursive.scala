@@ -12,12 +12,14 @@ object Recursive {
     private var _underlying: JsonDecoder[T] = _
     def set(d: JsonDecoder[T]): Unit = _underlying = d
     def decode(reader: JsonReader): T = _underlying.decode(reader)
+    override def toString: String = _underlying.toString
   }
 
   class Encoder[T] extends JsonEncoder[T] {
     private var _underlying: JsonEncoder[T] = _
     def set(d: JsonEncoder[T]): Unit = _underlying = d
     def encode(writer: JsonWriter, value: T): Unit = _underlying.encode(writer, value)
+    override def toString: String = _underlying.toString
   }
 
   class Format[T] extends JsonFormat[T] {
@@ -25,5 +27,6 @@ object Recursive {
     def set(d: JsonFormat[T]): Unit = _underlying = d
     def decode(reader: JsonReader): T = _underlying.decode(reader)
     def encode(writer: JsonWriter, value: T): Unit = _underlying.encode(writer, value)
+    override def toString: String = _underlying.toString
   }
 }

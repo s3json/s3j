@@ -51,6 +51,9 @@ object GenerationContext {
 
     /** @return Actual generated code for serializer */
     def generate(using Quotes)(): Expr[Any]
+
+    /** @return Whether generated code is something simple, and recursive wrapper could be avoided for it */
+    def simpleGeneration: Boolean = false
   }
 }
 

@@ -95,37 +95,37 @@ class AstJsonWriter extends JsonWriter {
     this
   }
 
-  def value(value: Boolean): JsonWriter = {
+  def boolValue(value: Boolean): JsonWriter = {
     stateMachine.value()
     state.pushValue(JsBoolean(value))
     this
   }
 
-  def value(value: Long): JsonWriter = {
-    stateMachine.value()
-    state.pushValue(JsLong(value))
+  def longValue(value: Long, unsigned: Boolean = false): JsonWriter = {
+    if (unsigned) state.pushValue(JsBigInt(BigInt(java.lang.Long.toUnsignedString(value, 10))))
+    else state.pushValue(JsLong(value))
     this
   }
 
-  def value(value: Double): JsonWriter = {
+  def doubleValue(value: Double): JsonWriter = {
     stateMachine.value()
     state.pushValue(JsDouble(value))
     this
   }
 
-  def value(value: BigInt): JsonWriter = {
+  def bigintValue(value: BigInt): JsonWriter = {
     stateMachine.value()
     state.pushValue(JsBigInt(value))
     this
   }
 
-  def value(value: BigDecimal): JsonWriter = {
+  def bigdecValue(value: BigDecimal): JsonWriter = {
     stateMachine.value()
     state.pushValue(JsBigDecimal(value))
     this
   }
 
-  def value(value: String): JsonWriter = {
+  def stringValue(value: String): JsonWriter = {
     if (state.entryType == TString) {
       state.stringBuilder ++= value
       return this
@@ -136,7 +136,7 @@ class AstJsonWriter extends JsonWriter {
     this
   }
 
-  def value(value: Array[Char], offset: Int, length: Int): JsonWriter = {
+  def stringValue(value: Array[Char], offset: Int, length: Int): JsonWriter = {
     if (state.entryType == TString) {
       state.stringBuilder.appendAll(value, offset, length)
       return this

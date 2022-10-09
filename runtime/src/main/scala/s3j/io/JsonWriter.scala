@@ -17,25 +17,25 @@ trait JsonWriter {
   def key(key: String): JsonWriter
 
   /** Write boolean value to stream */
-  def value(value: Boolean): JsonWriter
+  def boolValue(value: Boolean): JsonWriter
 
   /** Write long value to stream */
-  def value(value: Long): JsonWriter
+  def longValue(value: Long, unsigned: Boolean = false): JsonWriter
 
   /** Write double value to stream */
-  def value(value: Double): JsonWriter
+  def doubleValue(value: Double): JsonWriter
 
   /** Write [[BigInt]] value to stream */
-  def value(value: BigInt): JsonWriter
+  def bigintValue(value: BigInt): JsonWriter
 
   /** Write [[BigDecimal]] value to stream */
-  def value(value: BigDecimal): JsonWriter
+  def bigdecValue(value: BigDecimal): JsonWriter
 
   /** Write string value (or chunk when in string mode) to stream */
-  def value(value: String): JsonWriter
+  def stringValue(value: String): JsonWriter
 
   /** Write string value (or chunk when in string mode) to stream. */
-  def value(value: Array[Char], offset: Int, length: Int): JsonWriter
+  def stringValue(value: Array[Char], offset: Int, length: Int): JsonWriter
 
   /** Write null value to stream */
   def nullValue(): JsonWriter

@@ -100,7 +100,7 @@ object ObjectFormatUtils {
    */
   def encodeDiscriminator(writer: JsonWriter, field: String, value: String): JsonWriter = {
     val ww = writeBeginObject(writer)
-    ww.key(field).value(value)
+    ww.key(field).stringValue(value)
     StripObjectWriter(ww)
   }
 

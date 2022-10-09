@@ -66,12 +66,14 @@ object CodeUtils {
     case GenerationMode.Decoder => '{
       new JsonDecoder[T] {
         def decode(reader: JsonReader): T = ${ decoder('reader) }
+        override def toString: String = ${ Expr("JsonDecoder.derived[" + Type.show[T] + "]") }
       }
     }
 
     case GenerationMode.Encoder => '{
       new JsonEncoder[T] {
         def encode(writer: JsonWriter, value: T): Unit = ${ encoder('writer, 'value) }
+        override def toString: String = ${ Expr("JsonEncoder.derived[" + Type.show[T] + "]") }
       }
     }
 
@@ -79,6 +81,7 @@ object CodeUtils {
       new JsonFormat[T] {
         def decode(reader: JsonReader): T = ${ decoder('reader) }
         def encode(writer: JsonWriter, value: T): Unit = ${ encoder('writer, 'value) }
+        override def toString: String = ${ Expr("JsonFormat.derived[" + Type.show[T] + "]") }
       }
     }
   }

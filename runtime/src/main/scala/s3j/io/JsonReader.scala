@@ -73,4 +73,7 @@ abstract class JsonReader {
 
   /** Throw parse error at current parser position */
   def parseError(msg: String): Nothing = throw ParseException(location, msg)
+  
+  /** Throw parse error at current parser position */
+  def parseError(msg: String, cause: Throwable): Nothing = throw ParseException(location, msg, Some(cause))
 }

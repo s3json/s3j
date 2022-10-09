@@ -16,5 +16,7 @@ class StringFormat(maxLength: Int) extends JsonFormat[String] {
     else r
   }
 
-  def encode(writer: JsonWriter, value: String): Unit = writer.value(value)
+  def encode(writer: JsonWriter, value: String): Unit = writer.stringValue(value)
+
+  override def toString: String = s"StringFormat(maxLength = $maxLength)"
 }

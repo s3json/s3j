@@ -193,7 +193,6 @@ final case class JsBigInt(value: BigInt) extends JsNumber {
     case JsDouble(x)  => value.toDouble == x
     case JsBigInt(x)  => value == x
     case JsBigDecimal(x) => x.toBigIntExact.contains(value)
-    case x: JsNumber => value == x.toBigInt
     case _ => false
   }
 }

@@ -38,13 +38,13 @@ final case class StripObjectWriter(writer: JsonWriter) extends JsonWriter {
   }
 
   def key(key: String): JsonWriter = { writer.key(key); this }
-  def value(value: Boolean): JsonWriter = { writer.value(value); this }
-  def value(value: Long): JsonWriter = { writer.value(value); this }
-  def value(value: Double): JsonWriter = { writer.value(value); this }
-  def value(value: BigInt): JsonWriter = { writer.value(value); this }
-  def value(value: BigDecimal): JsonWriter = { writer.value(value); this }
-  def value(value: String): JsonWriter = { writer.value(value); this }
-  def value(value: Array[Char], offset: Int, length: Int): JsonWriter = { writer.value(value, offset, length); this }
+  def boolValue(value: Boolean): JsonWriter = { writer.boolValue(value); this }
+  def longValue(value: Long, unsigned: Boolean): JsonWriter = { writer.longValue(value, unsigned); this }
+  def doubleValue(value: Double): JsonWriter = { writer.doubleValue(value); this }
+  def bigintValue(value: BigInt): JsonWriter = { writer.bigintValue(value); this }
+  def bigdecValue(value: BigDecimal): JsonWriter = { writer.bigdecValue(value); this }
+  def stringValue(value: String): JsonWriter = { writer.stringValue(value); this }
+  def stringValue(value: Array[Char], offset: Int, length: Int): JsonWriter = { writer.stringValue(value, offset, length); this }
   def nullValue(): JsonWriter = { writer.nullValue(); this }
   def haveRawChunks: Boolean = writer.haveRawChunks
   def rawChunk(c: Array[Char], ofs: Int, len: Int): JsonWriter = { writer.rawChunk(c, ofs, len); this }

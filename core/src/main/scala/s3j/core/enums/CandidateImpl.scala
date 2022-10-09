@@ -75,7 +75,7 @@ extends GenerationCandidate {
     })
 
     if (asString)
-      return '{ $writer.value(${ Expr(c.discriminator) }) }
+      return '{ $writer.stringValue(${ Expr(c.discriminator) }) }
 
     def body(writer: Expr[JsonWriter])(using Quotes): Expr[Any] =
       if (c.singleton) '{}

@@ -120,42 +120,45 @@ class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
     this
   }
 
-  def value(value: Boolean): JsonWriter = {
+  def boolValue(value: Boolean): JsonWriter = {
     stateMachine.value()
     preValue()
     out.write(if (value) "true" else "false")
     this
   }
 
-  def value(value: Long): JsonWriter = {
+  def longValue(value: Long, unsigned: Boolean): JsonWriter = {
+    stateMachine.value()
+    preValue()
+    out.write(if (unsigned) java.lang.Long.toUnsignedString(value, 10) else java.lang.Long.toString(value, 10))
+    this
+  }
+
+  def doubleValue(value: Double): JsonWriter = {
+    stateMachine.value()
+    preValue()
+    if (value.isFinite) out.write(value.toString)
+    else if (value.isNaN) out.write("\"NaN\"")
+    else if (value.isPosInfinity) out.write("\"Infinity\"")
+    else out.write("\"-Infinity\"")
+    this
+  }
+
+  def bigintValue(value: BigInt): JsonWriter = {
     stateMachine.value()
     preValue()
     out.write(value.toString)
     this
   }
 
-  def value(value: Double): JsonWriter = {
+  def bigdecValue(value: BigDecimal): JsonWriter = {
     stateMachine.value()
     preValue()
     out.write(value.toString)
     this
   }
 
-  def value(value: BigInt): JsonWriter = {
-    stateMachine.value()
-    preValue()
-    out.write(value.toString)
-    this
-  }
-
-  def value(value: BigDecimal): JsonWriter = {
-    stateMachine.value()
-    preValue()
-    out.write(value.toString)
-    this
-  }
-
-  def value(value: String): JsonWriter = {
+  def stringValue(value: String): JsonWriter = {
     if (state.isString) {
       EscapeUtils.writeEscaped(value, out)
       return this
@@ -167,7 +170,7 @@ class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
     this
   }
 
-  def value(value: Array[Char], offset: Int, length: Int): JsonWriter = {
+  def stringValue(value: Array[Char], offset: Int, length: Int): JsonWriter = {
     if (state.isString) {
       EscapeUtils.writeEscaped(value, offset, length, out)
       return this

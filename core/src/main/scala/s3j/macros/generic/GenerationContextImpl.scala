@@ -300,7 +300,8 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       return _serializers(key)
     }
 
-    createHandle(task, key, key.identity, simpleGen = false, q => context.doGeneration(q).asInstanceOf[Term])
+    createHandle(task, key, key.identity, simpleGen = context.candidate.exists(_.simpleGeneration),
+      q => context.doGeneration(q).asInstanceOf[Term])
   }
 
   private def searchImplicits(t: TypeRepr): ImplicitSearchResult = {
