@@ -46,16 +46,16 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
     val statements = List.newBuilder[Statement]
     val serializers = _serializerSet.toVector.sortBy(_.order)
 
-    for (s <- serializers) {
-      if (s.recursiveWrapper) {
-        val recursiveSym = s.variableType.typeSymbol
-        val init = Apply(TypeApply(Select(New(Inferred(s.variableType)), recursiveSym.primaryConstructor),
-          List(Inferred(s.serializedType))), List())
+    for (s <- serializers if s.recursiveWrapper) {
+      val recursiveSym = s.variableType.typeSymbol
+      val init = Apply(TypeApply(Select(New(Inferred(s.variableType)), recursiveSym.primaryConstructor),
+        List(Inferred(s.serializedType))), List())
 
-        statements += ValDef(s.variableSymbol, Some(init.changeOwner(s.variableSymbol)))
-      } else {
-        statements += ValDef(s.variableSymbol, Some(s.definition /* should already have proper owner */))
-      }
+      statements += ValDef(s.variableSymbol, Some(init.changeOwner(s.variableSymbol)))
+    }
+
+    for (s <- serializers if !s.recursiveWrapper) {
+      statements += ValDef(s.variableSymbol, Some(s.definition /* should already have proper owner */))
     }
 
     for (s <- serializers if s.recursiveWrapper) {
