@@ -22,6 +22,12 @@ abstract class Plugin {
    */
   def extensions: Extensions = Extensions.empty
   
+  /** @return Plugin capabilities */
+  def capabilities: Set[PluginCapability] = Set.empty
+  
+  /** @return Extra locations to look for implicits (module symbols) */
+  def implicitLocations(using q: Quotes): Set[q.reflect.Symbol] = Set.empty
+  
   /** @return Modifier parser for this plugin */
   def modifierParser(using PluginContext): ModifierParser = ModifierParser.empty
 

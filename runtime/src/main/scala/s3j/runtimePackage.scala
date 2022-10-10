@@ -15,3 +15,4 @@ val  JsonDecoder    = format.JsonDecoder
 
 export io.IoExtensions.*
 export format.BasicFormats.given
+export format.CollectionFormats.given

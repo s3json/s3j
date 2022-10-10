@@ -1,3 +1,4 @@
+ThisBuild / organization := "io.s3j"
 ThisBuild / version := "0.1.0-SNAPSHOT"
 ThisBuild / scalaVersion := "3.2.0"
 
@@ -14,7 +15,8 @@ lazy val root = (project in file("."))
   .settings(
     name := "s3j-root",
     publishArtifact := false,
-    publishTo := None
+    publish := {},
+    publishLocal := {}
   )
 
 lazy val runtime = (project in file("runtime"))
@@ -27,7 +29,11 @@ lazy val core = (project in file("core"))
   .dependsOn(runtime)
   .settings(commonSettings)
   .settings(
-    name := "s3j"
+    name := "s3j",
+
+    libraryDependencies ++= Seq(
+      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value % Provided
+    )
   )
 
 def exampleProject(exampleName: String): Project = Project("example-" + exampleName, file("examples/" + exampleName))

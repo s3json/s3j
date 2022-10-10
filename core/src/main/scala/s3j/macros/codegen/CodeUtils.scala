@@ -1,7 +1,7 @@
 package s3j.macros.codegen
 
 import s3j.io.{JsonReader, JsonWriter}
-import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat}
+import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat, StringyDecoder}
 import s3j.macros.generic.GenerationMode
 
 import scala.quoted.*
@@ -84,6 +84,9 @@ object CodeUtils {
         override def toString: String = ${ Expr("JsonFormat.derived[" + Type.show[T] + "]") }
       }
     }
+
+    case GenerationMode.StringDecoder | GenerationMode.StringEncoder | GenerationMode.StringFormat =>
+      throw new IllegalArgumentException("Stringy generation modes are not supported by makeCodec")
   }
 
   /** Build a hash-code based string match code */

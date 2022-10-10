@@ -1,6 +1,6 @@
 package s3j.macros.generic
 
-import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat}
+import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat, StringyDecoder, StringyEncoder, StringyFormat}
 import s3j.macros.generic.GenerationMode
 
 import scala.compiletime.error
@@ -25,6 +25,9 @@ object GenerationMode {
         if (base =:= TypeRepr.of[JsonDecoder]) (Decoder, arg)
         else if (base =:= TypeRepr.of[JsonEncoder]) (Encoder, arg)
         else if (base =:= TypeRepr.of[JsonFormat]) (Format, arg)
+        else if (base =:= TypeRepr.of[StringyDecoder]) (StringDecoder, arg)
+        else if (base =:= TypeRepr.of[StringyEncoder]) (StringEncoder, arg)
+        else if (base =:= TypeRepr.of[StringyFormat]) (StringFormat, arg)
         else throwError
 
       case _ => throwError
@@ -35,6 +38,7 @@ object GenerationMode {
   case object Decoder extends GenerationMode {
     def generateEncoders: Boolean = false
     def generateDecoders: Boolean = true
+    def stringy: Boolean = false
 
     def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
       import q.reflect.*
@@ -42,10 +46,22 @@ object GenerationMode {
     }
   }
 
+  case object StringDecoder extends GenerationMode {
+    def generateEncoders: Boolean = false
+    def generateDecoders: Boolean = true
+    def stringy: Boolean = true
+
+    def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
+      import q.reflect.*
+      TypeRepr.of[StringyDecoder].appliedTo(t)
+    }
+  }
+
   /** Encoder-only generation mode */
   case object Encoder extends GenerationMode {
     def generateEncoders: Boolean = true
     def generateDecoders: Boolean = false
+    def stringy: Boolean = false
 
     def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
       import q.reflect.*
@@ -53,14 +69,38 @@ object GenerationMode {
     }
   }
 
+  case object StringEncoder extends GenerationMode {
+    def generateEncoders: Boolean = true
+    def generateDecoders: Boolean = false
+    def stringy: Boolean = true
+
+    def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
+      import q.reflect.*
+      TypeRepr.of[StringyEncoder].appliedTo(t)
+    }
+  }
+
   /** Decoder-and-encoder (format) generation mode */
   case object Format extends GenerationMode {
     def generateEncoders: Boolean = true
     def generateDecoders: Boolean = true
+    def stringy: Boolean = false
 
     def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
       import q.reflect.*
       TypeRepr.of[JsonFormat].appliedTo(t)
+    }
+  }
+
+  /** Decoder-and-encoder (format) generation mode */
+  case object StringFormat extends GenerationMode {
+    def generateEncoders: Boolean = true
+    def generateDecoders: Boolean = true
+    def stringy: Boolean = true
+
+    def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
+      import q.reflect.*
+      TypeRepr.of[StringyFormat].appliedTo(t)
     }
   }
 }
@@ -71,6 +111,13 @@ sealed trait GenerationMode {
 
   /** @return Whether we should generate decoders in this mode or not */
   def generateDecoders: Boolean
+
+  /** @return Whether this mode means stringy result */
+  def stringy: Boolean
+
+  /** @return Whether two modes are compatible in terms of decoding/encoding/formatting */
+  def modeCompatible(other: GenerationMode): Boolean =
+    generateEncoders == other.generateEncoders && generateDecoders == other.generateDecoders
 
   /** @return Type class applied to given type (e.g. `JsonDecoder[X]` when decoding) */
   def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr

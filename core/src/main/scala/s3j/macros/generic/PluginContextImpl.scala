@@ -1,7 +1,7 @@
 package s3j.macros.generic
 
 import s3j.macros.PluginContext.ExtensionRegistration
-import s3j.macros.{Plugin, PluginContext}
+import s3j.macros.{Plugin, PluginCapability, PluginContext}
 import s3j.macros.modifiers.{Modifier, ModifierParser}
 import s3j.macros.traits.ErrorReporting
 import s3j.macros.utils.{MacroUtils, QualifiedName, ReportingUtils}
@@ -20,6 +20,7 @@ extends PluginContext with ModifierParserImpl with GenerationContextImpl with Ge
       try instance.modifierParser(using PluginContextImpl.this)
       catch { case NonFatal(e) => ReportingUtils.reportException(s"Failed get modifier parser for plugin $className", e) }
 
+    val capabilities: Set[PluginCapability] = instance.capabilities
     val supportedModifiers: Set[String] = modifierParser.supportedTypes
   }
 
@@ -28,6 +29,7 @@ extends PluginContext with ModifierParserImpl with GenerationContextImpl with Ge
   protected var _pluginInstances: Set[Plugin] = Set.empty
   protected val _extensions: mutable.Map[Extensions.Key[_], Set[ExtensionRegistration[Any]]] = mutable.HashMap.empty
   protected val _modifiers: mutable.Map[String, PluginContainer] = mutable.HashMap.empty
+  protected var _implicitLocations: Set[q.reflect.Symbol] = Set.empty
 
   val report: ErrorReporting = ErrorReporting.fromQuotes
 
@@ -68,6 +70,7 @@ extends PluginContext with ModifierParserImpl with GenerationContextImpl with Ge
     _plugins.put(className, container)
     _pluginContainers += container
     _pluginInstances += instance
+    _implicitLocations ++= instance.implicitLocations
     for (mod <- container.supportedModifiers) _modifiers.put(mod, container)
     for ((k, vs) <- container.instance.extensions.untypedMap; v <- vs) {
       _extensions.put(k, _extensions.getOrElse(k, Set.empty) + ExtensionRegistration(className, instance, v))

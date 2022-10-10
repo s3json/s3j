@@ -3,8 +3,8 @@ package s3j.macros.generic
 import s3j.format.{JsonDecoder, JsonEncoder}
 import s3j.format.util.Recursive
 import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, GenerationRejection}
-import s3j.macros.codegen.Position as XPosition
-import s3j.macros.{GenerationContext, PluginContext}
+import s3j.macros.codegen.{AssistedImplicits, Position as XPosition}
+import s3j.macros.{GenerationContext, PluginContext, PluginCapability}
 import s3j.macros.modifiers.{BuiltinModifiers, ModifierSet}
 import s3j.macros.traits.{ErrorReporting, NestedBuilder, NestedResult, ReportingBuilder}
 import s3j.macros.utils.{ForbiddenMacroUtils, GenerationPath, MacroUtils, ReportingUtils}
@@ -14,6 +14,7 @@ import scala.util.control.NonFatal
 import scala.collection.mutable
 import scala.quoted.{Expr, Quotes, Type}
 import scala.quoted.runtime.StopMacroExpansion
+import scala.quoted.runtime.impl.QuotesImpl
 
 private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
   import q.reflect.*
@@ -22,13 +23,15 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
   private var _serializerIndex: Int = 0
 
   private case object ImplicitIdentity
-  case class StackEntry(target: TypeRepr, modifiers: ModifierSet, path: Seq[GenerationPath], label: Option[String])
+  case class StackEntry(target: TypeRepr, modifiers: ModifierSet, path: Seq[GenerationPath], label: Option[String],
+                        mode: GenerationMode)
 
   case class GenerationTask(stack: List[StackEntry]) {
     val isRoot: Boolean = stack.tail.isEmpty
     val target: TypeRepr = stack.head.target
     val typeSymbol: Symbol = target.typeSymbol
     val modifiers: ModifierSet = stack.head.modifiers
+    val mode: GenerationMode = stack.head.mode
 
     val basicKey: BasicCachingKey = BasicCachingKey(target, modifiers)
     val implicitKey: ImplicitCachingKey = ImplicitCachingKey(target)
@@ -61,7 +64,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
   extends GenerationContext { inner =>
     protected def generating: Boolean
 
-    val generationMode: GenerationMode = outer.generationMode
+    val generationMode: GenerationMode = task.mode
     val generatedType: Type[T] = task.target.asType.asInstanceOf[Type[T]]
     val typeSymbol: Symbol = task.target.typeSymbol
     val modifiers: ModifierSet = task.modifiers
@@ -110,7 +113,8 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
               target = or.TypeRepr.of[T],
               modifiers = _modifiers,
               path = _genPath,
-              label = None
+              label = None,
+              mode = generationMode
             ) :: task.stack
           ))
 
@@ -143,7 +147,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
 
       def build(): ErrorReporting = {
         val nextTask = GenerationTask(_stack.reverseIterator.foldLeft(task.stack) { (list, entry) =>
-          StackEntry(TypeRepr.of(using entry.t), ModifierSet.empty, entry.path, entry.label) :: list
+          StackEntry(TypeRepr.of(using entry.t), ModifierSet.empty, entry.path, entry.label, generationMode) :: list
         })
 
         outer.report.transform(
@@ -157,11 +161,17 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
   private class ContextImpl(task: GenerationTask, owner: PluginContainer) extends BasicContextImpl(task, owner) {
     var generating: Boolean = false
 
-    val outcome: GenerationOutcome =
-      try owner.instance.generate(modifiers)(using outer.q, this, generatedType)
-      catch {
-        case NonFatal(e) => reportException("Plugin threw an exception while producing generation outcome", e)
-      }
+    val outcome: GenerationOutcome = {
+      val baseOutcome =
+        try owner.instance.generate(modifiers)(using outer.q, this, generatedType)
+        catch {
+          case NonFatal(e) => reportException("Plugin threw an exception while producing generation outcome", e)
+        }
+
+      if (!generationMode.stringy || owner.capabilities(PluginCapability.SupportsStrings)) baseOutcome
+      else if (!baseOutcome.isInstanceOf[GenerationCandidate]) baseOutcome
+      else GenerationRejection("Plugin does not support generation of stringy formats")
+    }
 
     val candidate: Option[GenerationCandidate] =
       outcome match {
@@ -304,14 +314,49 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       q => context.doGeneration(q).asInstanceOf[Term])
   }
 
-  private def searchImplicits(t: TypeRepr): ImplicitSearchResult = {
-    // TODO: Find a way to augment the search path
-    Implicits.search(t)
+  private def searchImplicits(t: TypeRepr): AssistedImplicits.SearchResult = {
+    val assistedHelper = generationMode match {
+      case GenerationMode.Decoder | GenerationMode.StringDecoder =>
+        Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Decoder")
+
+      case GenerationMode.Encoder | GenerationMode.StringEncoder =>
+        Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Encoder")
+
+      case GenerationMode.Format | GenerationMode.StringFormat =>
+        Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Format")
+    }
+
+    AssistedImplicits.search(t, _implicitLocations, Some(assistedHelper))
+  }
+
+  private def generateImplicit(task: GenerationTask, r: AssistedImplicits.SearchSuccess)(using q: Quotes): Expr[Any] = {
+    import q.reflect.*
+    val holes = r.holes.map { tpe =>
+      val (subMode, target) = GenerationMode.decode(TypeRepr.of(using tpe))
+      if (!generationMode.modeCompatible(subMode)) {
+        throw new RuntimeException("Implicit hole has an incompatible generation mode: mode=" + generationMode +
+          ", hole=" + Type.show(using tpe))
+      }
+
+      val subTask = GenerationTask(
+        stack = StackEntry(
+          target = target.asInstanceOf[outer.q.reflect.TypeRepr],
+          modifiers = task.modifiers,
+          path = Nil,
+          label = None,
+          mode = subMode
+        ) :: task.stack
+      )
+
+      generate(subTask).variableRef.asExpr
+    }
+
+    r.expr(holes)
   }
 
   def generateRoot(tpe: TypeRepr, modifiers: ModifierSet): Symbol =
     generate(GenerationTask(
-      stack = StackEntry(tpe, modifiers, Nil, None) :: Nil
+      stack = StackEntry(tpe, modifiers, Nil, None, generationMode) :: Nil
     )).variableSymbol
 
   private def generate(task: GenerationTask): SerializerHandle = {
@@ -335,16 +380,17 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
     }
 
     searchImplicits(generationMode.appliedType(task.target)) match {
-      case success: ImplicitSearchSuccess =>
-        createHandle(task, task.implicitKey, ImplicitIdentity, simpleGen = true, _ => success.tree)
+      case success: AssistedImplicits.SearchSuccess =>
+        createHandle(task, task.implicitKey, ImplicitIdentity, simpleGen = true,
+          q => generateImplicit(task, success)(using q).asTerm)
 
-      case failure: ImplicitSearchFailure =>
+      case AssistedImplicits.SearchFailure(explanation) =>
         if (task.modifiers.contains(BuiltinModifiers.requireImplicit)) {
           report.errorAndAbort(formatMessage("@requireImplicit is present and no implicit candidate was found:\n\n" +
-            failure.explanation, task, plugin = None))
+            explanation, task, plugin = None))
         }
 
-        runGenerationPlugins(task, failure.explanation)
+        runGenerationPlugins(task, explanation)
     }
   }
 }

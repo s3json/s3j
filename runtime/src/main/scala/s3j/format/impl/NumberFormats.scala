@@ -1,6 +1,6 @@
 package s3j.format.impl
 
-import s3j.format.JsonFormat
+import s3j.format.{JsonFormat, StringyFormat}
 import s3j.format.util.DecoderUtils
 import s3j.io.{JsonReader, JsonToken, JsonWriter}
 
@@ -114,6 +114,13 @@ object NumberFormats {
     override def toString: String = "unsignedByteFormat"
   }
 
+  /** Stringy signed byte format */
+  given byteStringyFormat: StringyFormat[Byte] with {
+    def encode(value: Byte): String = value.toString
+    def decode(str: String): Byte = java.lang.Byte.parseByte(str, 10)
+    override def toString: String = "stringyByteFormat"
+  }
+
   /** Signed short format */
   given shortFormat: JsonFormat[Short] with {
     def encode(writer: JsonWriter, value: Short): Unit = writer.longValue(value)
@@ -136,6 +143,13 @@ object NumberFormats {
     }
 
     override def toString: String = "unsignedShortFormat"
+  }
+
+  /** Stringy signed short format */
+  given shortStringyFormat: StringyFormat[Short] with {
+    def encode(value: Short): String = value.toString
+    def decode(str: String): Short = java.lang.Short.parseShort(str, 10)
+    override def toString: String = "stringyShortFormat"
   }
 
   /** Signed int format */
@@ -162,6 +176,13 @@ object NumberFormats {
     override def toString: String = "unsignedIntFormat"
   }
 
+  /** Stringy signed int format */
+  given intStringyFormat: StringyFormat[Int] with {
+    def encode(value: Int): String = value.toString
+    def decode(str: String): Int = java.lang.Integer.parseInt(str, 10)
+    override def toString: String = "stringyIntFormat"
+  }
+
   /** Signed long format */
   given longFormat: JsonFormat[Long] with {
     def encode(writer: JsonWriter, value: Long): Unit = writer.longValue(value)
@@ -176,6 +197,13 @@ object NumberFormats {
     override def toString: String = "unsignedLongFormat"
   }
 
+  /** Stringy long format */
+  given longStringyFormat: StringyFormat[Long] with {
+    def encode(value: Long): String = value.toString
+    def decode(str: String): Long = java.lang.Long.parseLong(str, 10)
+    override def toString: String = "stringyLongFormat"
+  }
+
   /** Single-precision float format */
   given floatFormat: JsonFormat[Float] with {
     def encode(writer: JsonWriter, value: Float): Unit = writer.doubleValue(value)
@@ -183,11 +211,25 @@ object NumberFormats {
     override def toString: String = "floatFormat"
   }
 
+  /** Stringy single-precision float format */
+  given stringyFloatFormat: StringyFormat[Float] with {
+    def encode(value: Float): String = value.toString
+    def decode(str: String): Float = java.lang.Float.parseFloat(str)
+    override def toString: String = "stringyFloatFormat"
+  }
+
   /** Double-precision float format */
   given doubleFormat: JsonFormat[Double] with {
     def encode(writer: JsonWriter, value: Double): Unit = writer.doubleValue(value)
     def decode(reader: JsonReader): Double = decodeDouble(reader)
     override def toString: String = "doubleFormat"
+  }
+
+  /** Stringy double-precision float format */
+  given stringyDoubleFloat: StringyFormat[Double] with {
+    def encode(value: Double): String = value.toString
+    def decode(str: String): Double = java.lang.Double.parseDouble(str)
+    override def toString: String = "stringyDoubleFormat"
   }
 
   /** @return [[JsonFormat]] instance for [[BigInt]]s with number length limit */

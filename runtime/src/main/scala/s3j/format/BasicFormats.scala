@@ -19,10 +19,24 @@ object BasicFormats {
     override def toString: String = "booleanFormat"
   }
 
+  /** Stringy boolean format */
+  given stringyBooleanFormat: StringyFormat[Boolean] with {
+    def encode(value: Boolean): String = value.toString
+    def decode(str: String): Boolean = java.lang.Boolean.parseBoolean(str)
+    override def toString: String = "stringyBooleanFormat"
+  }
+
   export NumberFormats.given
 
   /** String format with unlimited length */
   given stringFormat: JsonFormat[String] = new StringFormat(Int.MaxValue)
+
+  /** Stringy format for strings */
+  given stringStringyFormat: StringyFormat[String] with {
+    def encode(value: String): String = value
+    def decode(str: String): String = str
+    override def toString: String = "stringStringyFormat"
+  }
 
   /** Standard UUID-as-string format */
   given uuidFormat: JsonFormat[UUID] with {
@@ -32,7 +46,14 @@ object BasicFormats {
     def decode(reader: JsonReader): UUID =
       UUID.fromString(DecoderUtils.decodeString(reader, 36, "too long string for UUID: length is 36 characters"))
 
-    override def toString: String = "UuidFormat"
+    override def toString: String = "uuidFormat"
+  }
+
+  /** Stringy format for UUIDs */
+  given uuidStringyFormat: StringyFormat[UUID] with {
+    def encode(value: UUID): String = value.toString
+    def decode(str: String): UUID = UUID.fromString(str)
+    override def toString: String = "uuidStringyFormat"
   }
 
   /** Format for parsing arbitrary JSON data as [[JsValue]] */
