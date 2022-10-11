@@ -14,7 +14,7 @@ class StreamWriterTest extends AnyFlatSpec with Matchers {
 
   it should "serialize root values" in {
     generateJson(0, _.boolValue(true)) shouldBe "true"
-    generateJson(0, _.doubleValue(1234)) shouldBe "1234"
+    generateJson(0, _.longValue(1234)) shouldBe "1234"
     generateJson(0, _.stringValue("qwe")) shouldBe "\"qwe\""
     generateJson(0, _.nullValue()) shouldBe "null"
   }
@@ -27,16 +27,16 @@ class StreamWriterTest extends AnyFlatSpec with Matchers {
   }
 
   it should "serialize arrays/objects" in {
-    generateJson(0, _.beginArray().doubleValue(123).boolValue(true).stringValue("qwe").end()) shouldBe
+    generateJson(0, _.beginArray().longValue(123).boolValue(true).stringValue("qwe").end()) shouldBe
       "[123,true,\"qwe\"]"
 
-    generateJson(2, _.beginArray().doubleValue(123).boolValue(true).stringValue("qwe").end()) shouldBe
+    generateJson(2, _.beginArray().longValue(123).boolValue(true).stringValue("qwe").end()) shouldBe
       "[\n  123,\n  true,\n  \"qwe\"\n]"
 
-    generateJson(0, _.beginObject().key("x").doubleValue(123).key("y").nullValue().end()) shouldBe
+    generateJson(0, _.beginObject().key("x").longValue(123).key("y").nullValue().end()) shouldBe
       "{\"x\":123,\"y\":null}"
 
-    generateJson(2, _.beginObject().key("x").doubleValue(123).key("y").nullValue().end()) shouldBe
+    generateJson(2, _.beginObject().key("x").longValue(123).key("y").nullValue().end()) shouldBe
       "{\n  \"x\": 123,\n  \"y\": null\n}"
   }
 

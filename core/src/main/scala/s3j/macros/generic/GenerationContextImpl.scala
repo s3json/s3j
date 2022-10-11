@@ -27,8 +27,11 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
                         mode: GenerationMode)
 
   case class GenerationTask(stack: List[StackEntry]) {
+    type T
+
     val isRoot: Boolean = stack.tail.isEmpty
     val target: TypeRepr = stack.head.target
+    val targetType: Type[T] = target.asType.asInstanceOf[Type[T]]
     val typeSymbol: Symbol = target.typeSymbol
     val modifiers: ModifierSet = stack.head.modifiers
     val mode: GenerationMode = stack.head.mode
@@ -364,11 +367,16 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       return _serializers(task.basicKey)
     }
 
+    val suppressedByPlugins: Set[PluginContainer] = _pluginContainers
+        .filter(c => c.instance.suppressImplicitSearch(task.modifiers)(using q, this, task.targetType))
+
     val suppressImplicitsReason: Option[String] =
       if (task.isRoot || task.typeSymbol == typeSymbol) Some("serializer for root type is always generated")
       else if (task.modifiers.values.exists(_.suppressImplicitSearch)) {
         val mods = task.modifiers.values.filter(_.suppressImplicitSearch)
         Some("suppressed by modifiers: " + mods.mkString(", "))
+      } else if (suppressedByPlugins.nonEmpty) {
+        Some("supressed by plugins: " + suppressedByPlugins.map(_.className).mkString(", "))
       } else None
 
     if (suppressImplicitsReason.nonEmpty) {

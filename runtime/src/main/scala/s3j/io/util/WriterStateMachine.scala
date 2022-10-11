@@ -32,13 +32,8 @@ class WriterStateMachine {
   }
 
   def beginArray(): Unit = checkBegin("array", SArrayValue)
-
   def beginObject(): Unit = checkBegin("object", SObjectKey)
-
-  def beginString(): Unit = {
-    value()
-    checkBegin("string", SString)
-  }
+  def beginString(): Unit = checkBegin("string", SString)
 
   def value(): Unit = {
     if (_state != SObjectValue && _state != SArrayValue && _state != SRoot)

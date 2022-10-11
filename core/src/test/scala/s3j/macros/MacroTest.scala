@@ -237,4 +237,30 @@ class MacroTest extends AnyFlatSpec with Matchers {
     "{\"type\":\"TestA\",\"x\":\"X\"}".convertTo[Test] shouldBe TestA("X")
     "{\"type\":\"TestB\",\"y\":\"Y\"}".convertTo[Test] shouldBe TestB("Y")
   }
+
+  it should "serialize collections" in {
+    case class Test(a: Int, b: Seq[Test]) derives JsonFormat
+    Test(123, Seq(Test(456, Nil), Test(789, Seq(Test(0, Nil))))).toJsonString shouldBe
+      "{\"a\":123,\"b\":[{\"a\":456,\"b\":[]},{\"a\":789,\"b\":[{\"a\":0,\"b\":[]}]}]}"
+
+    "{\"a\":123,\"b\":[{\"a\":456,\"b\":[]}]}".convertTo[Test] shouldBe Test(123, Seq(Test(456, Nil)))
+  }
+
+  it should "serialize maps" in {
+    case class TestA(a: Int)
+    case class Test(a: Map[String, TestA]) derives JsonFormat
+
+    Test(Map("mew" -> TestA(123), "bark" -> TestA(456))).toJsonString shouldBe
+      "{\"a\":{\"mew\":{\"a\":123},\"bark\":{\"a\":456}}}"
+
+    "{\"a\":{\"mew\":{\"a\":0},\"bark\":{\"a\":1}}}".convertTo[Test] shouldBe
+      Test(Map("mew" -> TestA(0), "bark" -> TestA(1)))
+  }
+
+  it should "generate binary formats" in {
+    case class Test(@base64url x: Array[Byte], @hex y: Array[Byte]) derives JsonFormat
+
+    Test(Array(-1, -1), Array(-1, -2)).toJsonString shouldBe "{\"x\":\"__8\",\"y\":\"fffe\"}"
+    // Array[Byte].equals is not well-defined, so no decoding for now.
+  }
 }

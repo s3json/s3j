@@ -32,4 +32,11 @@ extends JsonFormat[Map[K, V]] {
     ObjectFormatUtils.expectEndObject(reader)
     bld.result()
   }
+  
+  override def toString: String = {
+    if (kEnc == kDec && vEnc == vDec) s"MapFormat(k=$kEnc, v=$vEnc)"
+    else if (kEnc == null) s"MapDecoder(k=$kDec, v=$vDec)"
+    else if (kDec == null) s"MapEncoder(k=$kEnc, v=$vEnc)"
+    else s"MapFormat(kEnc=$kEnc, kDec=$kDec, vEnc=$vEnc, vDec=$vDec)"
+  }
 }

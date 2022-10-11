@@ -89,6 +89,13 @@ final class CharRange(val data: Array[Char]) {
   /** @return Character at current position; position is left unchanged */
   def head: Char = _data(_position)
 
+  /** Copy data into target buffer, adjust position */
+  def get(target: Array[Char], offset: Int, length: Int): CharRange = {
+    System.arraycopy(_data, _position, target, offset, length)
+    _position += length
+    this
+  }
+  
   /** Put the given char sequence at current position and advance position by length of the sequence */
   def put(s: CharSequence): CharRange = put(s, 0, s.length())
 

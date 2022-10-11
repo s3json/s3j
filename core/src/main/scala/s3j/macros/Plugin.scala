@@ -30,6 +30,9 @@ abstract class Plugin {
   
   /** @return Modifier parser for this plugin */
   def modifierParser(using PluginContext): ModifierParser = ModifierParser.empty
+  
+  /** @return Whether implicit search should be suppressed for this type */
+  def suppressImplicitSearch[T](modifiers: ModifierSet)(using Quotes, PluginContext, Type[T]): Boolean = false
 
   /**
    * Perform generation for a type with specified modifiers. Plugin should decide whether it is able to perform that
