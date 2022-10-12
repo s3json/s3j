@@ -1,6 +1,6 @@
 package s3j.macros.modifiers
 
-import s3j.macros.modifiers.ModifierParser.AnnotationModifier
+import s3j.macros.modifiers.ModifierParser.{AnnotationModifier, TextModifier}
 
 import scala.quoted.quotes
 
@@ -13,5 +13,7 @@ object ModifierParsers {
         case arg :: Nil if arg.isExprOf[String] => f(arg.asExprOf[String].valueOrAbort)
         case _ => report.errorAndAbort("@key annotation must contain a string literal as argument")
       }
+
+    case text: TextModifier => f(text.content)
   }
 }

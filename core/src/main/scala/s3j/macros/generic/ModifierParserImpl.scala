@@ -1,7 +1,7 @@
 package s3j.macros.generic
 
 import s3j.macros.PluginContext.SymbolModifiers
-import s3j.macros.modifiers.ModifierParser.AnnotationModifier
+import s3j.macros.modifiers.ModifierParser.{AnnotationModifier, TextModifier}
 
 import scala.collection.mutable
 import s3j.macros.modifiers.{Modifier, ModifierContext, ModifierKey, ModifierSet}
@@ -17,6 +17,7 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_
 
   // == State: =========================================================================================================
 
+  private lazy val _rootModifiers: ModifierSet = parseRootModifiers()
   private val _modifierCache: mutable.Map[Symbol, ModifierData] = mutable.HashMap.empty
   private val _seenAnnotations: mutable.Set[String] = mutable.HashSet.empty
   private val _unparsedAnnotations: mutable.Set[String] = mutable.HashSet.empty
@@ -40,6 +41,13 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_
       }
 
     override def toString: String = PluginCtxUtils.formatAnnotation(annotation, typeArgs, args)
+  }
+
+  protected case class TextModifierImpl(context: ModifierContext, typeName: String, content: String)
+  extends TextModifier {
+    override def toString: String =
+      if (content.nonEmpty) s"@$typeName=$content"
+      else s"@$typeName"
   }
 
   private case class ModifierData(
@@ -67,6 +75,32 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_
 
     case _ => report.errorAndAbort("Could not parse annotation term: " + annot
       .show(using Printer.TreeStructure), annot.pos)
+  }
+
+  private def parseRootModifiers(): ModifierSet = {
+    val modifiers = MacroUtils
+      .macroSettings(MacroUtils.ModifierPrefix)
+      .map { setting =>
+        setting.split("=", 2) match {
+          case Array(className) => TextModifierImpl(ModifierContext.Generic, className, "")
+          case Array(className, data) => TextModifierImpl(ModifierContext.Generic, className, data)
+        }
+      }
+      .map { modifier =>
+        _modifiers.get(modifier.typeName) match {
+          case Some(parser) => 
+            try parser.modifierParser(modifier)
+            catch {
+              case NonFatal(e) => report.errorAndAbort(ReportingUtils.formatException(
+                "Failed to parse a global modifier: " + modifier, e))
+            }
+            
+          case None => report.errorAndAbort("No plugin is available to parse a global modifier " + modifier + ". " +
+            "Consider adding an 'usePlugin' global setting to load appropriate plugin.")
+        }
+      }
+
+    ModifierSet(modifiers:_*)
   }
 
   /** @return true if annotation was recognized as meta-annotation */
@@ -164,10 +198,7 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_
         .toVector
 
       val own = ModifierSet(modifiers:_*)
-      val inherited = parentModifiers match {
-        case Some(parent) => ModifierSet.inherit(parent.inherited, own)
-        case None => own
-      }
+      val inherited = ModifierSet.inherit(parentModifiers.fold(_rootModifiers)(_.inherited), own)
       
       val ret = ModifierData(sym, parentModifiers, own, inherited)
 

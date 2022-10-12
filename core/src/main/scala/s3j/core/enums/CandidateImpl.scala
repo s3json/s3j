@@ -9,6 +9,7 @@ import s3j.io.{JsonReader, JsonToken, JsonWriter}
 import s3j.macros.GenerationContext
 import s3j.macros.GenerationContext.GenerationCandidate
 import s3j.macros.codegen.{CodeUtils, Variable}
+import s3j.macros.generic.GenerationConfidence
 import s3j.macros.modifiers.ModifierSet
 import s3j.macros.traits.NestedResult
 
@@ -62,7 +63,7 @@ extends GenerationCandidate {
       EnumCase(sym, mods, i, !sym.isClassDef, discriminator)
     }
 
-  val confidence: Option[Int] = Some(500)
+  val confidence: GenerationConfidence = 500
   val identity: AnyRef = EnumIdentity(behavior, cases
     .map(c => EnumCaseIdentity(c.discriminator))
     .toSet)

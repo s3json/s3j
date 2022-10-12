@@ -166,12 +166,12 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
       field.report.errorAndAbort("No plugin is available to handle generation of this field")
     }
 
-    val confidentCount = contexts.count(_.candidate.exists(_.confidence.isEmpty))
-    if (confidentCount > 1) {
+    val certainCount = contexts.count(_.candidate.exists(_.confidence.isCertain))
+    if (certainCount > 1) {
       val sb = new mutable.StringBuilder()
       sb ++= "Multiple plugins produced conflicting field candidates:\n"
 
-      for (c <- contexts if c.candidate.exists(_.confidence.isEmpty)) {
+      for (c <- contexts if c.candidate.exists(_.confidence.isCertain)) {
         sb ++= " - " ++= c.ext.pluginInstance.name ++= " (plugin '" ++= c.ext.pluginClass ++= "', extension '"
         sb ++= c.ext.instance.getClass.getName ++= "')\n"
       }
@@ -180,8 +180,8 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
     }
 
     val result: FieldContextImpl =
-      if (confidentCount > 0) contexts.find(_.candidate.exists(_.confidence.isEmpty)).get
-      else contexts.filter(_.candidate.isDefined).maxBy(_.candidate.get.confidence.get)
+      if (certainCount > 0) contexts.find(_.candidate.exists(_.confidence.isCertain)).get
+      else contexts.filter(_.candidate.isDefined).maxBy(_.candidate.get.confidence.value)
 
     field.result =
       try result.candidate.get.result.asInstanceOf[ObjectField[field.T]]

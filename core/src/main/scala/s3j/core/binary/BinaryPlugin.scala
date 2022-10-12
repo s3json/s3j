@@ -3,6 +3,7 @@ package s3j.core.binary
 import s3j.annotations.{base64, base64url, hex, hexUpper}
 import s3j.format.impl.{BinaryEncoding, BinaryFormats}
 import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, GenerationRejection, GenerationUnsupported}
+import s3j.macros.generic.{GenerationConfidence, ImplicitBehavior}
 import s3j.macros.modifiers.{ModifierParser, ModifierSet}
 import s3j.macros.{GenerationContext, Plugin, PluginContext}
 
@@ -27,8 +28,9 @@ class BinaryPlugin extends Plugin {
     else None
   }
 
-  override def suppressImplicitSearch[T](modifiers: ModifierSet)(using Quotes, PluginContext, Type[T]): Boolean =
-    modifiers.contains(BinaryFormatModifier.key) && generateBinary[T].isDefined
+  override def implicitBehavior[T](modifiers: ModifierSet)(using Quotes, PluginContext, Type[T]): ImplicitBehavior =
+    if (modifiers.contains(BinaryFormatModifier.key) && generateBinary[T].isDefined) ImplicitBehavior.Suppress
+    else ImplicitBehavior.Neutral
 
   override def generate[T](modifiers: ModifierSet)(using Quotes, GenerationContext, Type[T]): GenerationOutcome =
     generateBinary[T] match {
@@ -36,7 +38,7 @@ class BinaryPlugin extends Plugin {
         if (!modifiers.contains(BinaryFormatModifier.key))
           GenerationRejection("No binary encoding format is set. Use annotations like @base64 to select one.")
         else new GenerationCandidate {
-          def confidence: Option[Int] = Some(1000)
+          def confidence: GenerationConfidence = 1000
           def identity: AnyRef = modifiers(BinaryFormatModifier.key)
           override def simpleGeneration: Boolean = true
 

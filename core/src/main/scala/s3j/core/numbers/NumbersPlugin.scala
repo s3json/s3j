@@ -3,6 +3,7 @@ package s3j.core.numbers
 import s3j.annotations.jsonUnsigned
 import s3j.format.impl.NumberFormats
 import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, GenerationRejection, GenerationUnsupported}
+import s3j.macros.generic.GenerationConfidence
 import s3j.macros.modifiers.{ModifierParser, ModifierSet}
 import s3j.macros.{GenerationContext, Plugin, PluginContext}
 
@@ -19,7 +20,7 @@ class NumbersPlugin extends Plugin {
 
   private def makeCandidate(expr: Quotes ?=> Expr[Any]): GenerationCandidate =
     new GenerationCandidate {
-      val confidence: Option[Int] = None
+      val confidence: GenerationConfidence = GenerationConfidence.Certain
       val identity: AnyRef = UnsignedNumberIdentity
       def generate(using Quotes)(): Expr[Any] = expr
       override def simpleGeneration: Boolean = true

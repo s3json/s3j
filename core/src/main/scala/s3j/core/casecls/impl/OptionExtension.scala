@@ -6,6 +6,7 @@ import s3j.core.casecls.modifiers.NullOptionModifier
 import s3j.format.util.DecoderUtils
 import s3j.io.{JsonReader, JsonToken, JsonWriter}
 import s3j.macros.codegen.Variable
+import s3j.macros.generic.GenerationConfidence
 import s3j.macros.traits.NestedResult
 
 import scala.quoted.*
@@ -59,7 +60,7 @@ class OptionExtension extends CaseClassExtension {
     import q.reflect.*
     if (!(TypeRepr.of[T] <:< TypeRepr.of[Option[Any]])) GenerationUnsupported
     else new GenerationCandidate[T] {
-      def confidence: Option[Int] = Some(1000)
+      def confidence: GenerationConfidence = 1000
       def result: ObjectField[T] = {
         type I
         given inner: Type[I] = TypeRepr.of[T].typeArgs.head.asType.asInstanceOf[Type[I]]

@@ -4,9 +4,10 @@ import s3j.core.casecls.CaseClassContext.{ObjectModel, ObjectModelBuilder}
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.GenerationContext
 import s3j.macros.codegen.{NameGenerator, Variable}
+import s3j.macros.generic.GenerationConfidence
 import s3j.macros.modifiers.ModifierSet
 import s3j.macros.traits.{BasicPluginContext, NestedBuilder}
-import s3j.macros.utils.{GenerationPath}
+import s3j.macros.utils.GenerationPath
 
 import scala.quoted.{Expr, Quotes, Type}
 
@@ -159,7 +160,7 @@ object CaseClassContext {
   /** Positive outcome for case class generation */
   trait GenerationCandidate[T] extends GenerationOutcome[T] {
     /** @return Confidence for the candidate (confidence logic follows overall plugin cofidence logic) */
-    def confidence: Option[Int]
+    def confidence: GenerationConfidence
 
     /** @return Materialized object field */
     def result: ObjectField[T]

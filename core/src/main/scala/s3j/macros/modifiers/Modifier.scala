@@ -8,9 +8,6 @@ trait Modifier {
   /** @return Key assigned to that modifier */
   def key: ModifierKey[_ <: Modifier]
   
-  /** @return Whether presence of this modifier suppresses implicit search for type */
-  def suppressImplicitSearch: Boolean = false
-  
   /** @return Whether this modifier could be inherited from parent symbols */
   def inheritable: Boolean = true
 }

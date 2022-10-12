@@ -4,6 +4,7 @@ import s3j.core.binary.BinaryPlugin
 import s3j.core.casecls.CaseClassPlugin
 import s3j.core.enums.EnumerationPlugin
 import s3j.macros.generic.{BuiltinsPlugin, PluginContextImpl}
+import s3j.macros.utils.MacroUtils
 
 import java.util.{Base64, ServiceLoader}
 import scala.collection.mutable
@@ -22,6 +23,11 @@ object JsonMacros {
     ctx.loadPlugin[CaseClassPlugin]()
     ctx.loadPlugin[EnumerationPlugin]()
     ctx.loadPlugin[BinaryPlugin]()
+
+    // Load user-configured plugins:
+    for (plugin <- MacroUtils.macroSettings(MacroUtils.UsePluginPrefix)) {
+      ctx.loadPlugin(plugin)
+    }
 
     val effectiveModifiers = ctx.symbolModifiers(ctx.typeSymbol).inherited ++
       ctx.symbolModifiers(Symbol.spliceOwner).own

@@ -8,8 +8,9 @@ import s3j.format.util.ObjectFormatUtils
 import s3j.format.util.ObjectFormatUtils.RestFieldsBuilder
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.codegen.Variable
+import s3j.macros.generic.GenerationConfidence
 
-import scala.quoted.{Expr, Type, Quotes, quotes}
+import scala.quoted.{Expr, Quotes, Type, quotes}
 
 class RestFieldsExtension extends CaseClassExtension {
   private case object RestFieldsIdentity
@@ -51,7 +52,7 @@ class RestFieldsExtension extends CaseClassExtension {
       }
 
       new GenerationCandidate[T] {
-        def confidence: Option[Int] = None
+        def confidence: GenerationConfidence = GenerationConfidence.Certain
         def result: ObjectField[T] = new ObjectFieldImpl[T]()
       }
     }

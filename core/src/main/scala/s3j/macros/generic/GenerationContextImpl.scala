@@ -284,26 +284,26 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       report.errorAndAbort(formatMessage(sb.result(), task, None))
     }
 
-    val definiteCandidates = contexts.filter(c => c.candidate.exists(_.confidence.isEmpty))
-    if (definiteCandidates.size > 1) {
+    val certainCandidates = contexts.filter(c => c.candidate.exists(_.confidence.isCertain))
+    if (certainCandidates.size > 1) {
       val sb = new mutable.StringBuilder()
       sb ++= "Multiple plugins produced conflicting serializer candidates:\n"
 
-      for (c <- definiteCandidates) {
+      for (c <- certainCandidates) {
         sb ++= "\n - plugin '" ++= c.owner.name ++= "' (" ++= c.owner.className ++= ")"
       }
 
       report.errorAndAbort(formatMessage(sb.result(), task, None))
     }
 
-    if (definiteCandidates.nonEmpty) {
-      return definiteCandidates.head
+    if (certainCandidates.nonEmpty) {
+      return certainCandidates.head
     }
 
     // Otherwise, select most confident candidate
     contexts
-      .filter(c => c.candidate.exists(_.confidence.nonEmpty))
-      .maxBy(_.candidate.get.confidence.get)
+      .filter(c => c.candidate.isDefined)
+      .maxBy(_.candidate.get.confidence.value)
   }
 
   private def runGenerationPlugins(task: GenerationTask, implicitError: String): SerializerHandle = {
@@ -317,7 +317,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       q => context.doGeneration(q).asInstanceOf[Term])
   }
 
-  private def searchImplicits(t: TypeRepr): AssistedImplicits.SearchResult = {
+  private def searchImplicits(t: TypeRepr, behaviors: Set[ImplicitBehavior]): AssistedImplicits.SearchResult = {
     val assistedHelper = generationMode match {
       case GenerationMode.Decoder | GenerationMode.StringDecoder =>
         Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Decoder")
@@ -329,7 +329,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
         Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Format")
     }
 
-    AssistedImplicits.search(t, _implicitLocations, Some(assistedHelper))
+    AssistedImplicits.search(t, behaviors.flatMap(_.extraLocations), Some(assistedHelper))
   }
 
   private def generateImplicit(task: GenerationTask, r: AssistedImplicits.SearchSuccess)(using q: Quotes): Expr[Any] = {
@@ -367,16 +367,17 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       return _serializers(task.basicKey)
     }
 
-    val suppressedByPlugins: Set[PluginContainer] = _pluginContainers
-        .filter(c => c.instance.suppressImplicitSearch(task.modifiers)(using q, this, task.targetType))
+    val implicitBehaviors: Set[(ImplicitBehavior, PluginContainer)] = _pluginContainers
+      .map(c => c.instance.implicitBehavior(task.modifiers)(using q, this, task.targetType) -> c)
 
     val suppressImplicitsReason: Option[String] =
       if (task.isRoot || task.typeSymbol == typeSymbol) Some("serializer for root type is always generated")
-      else if (task.modifiers.values.exists(_.suppressImplicitSearch)) {
-        val mods = task.modifiers.values.filter(_.suppressImplicitSearch)
-        Some("suppressed by modifiers: " + mods.mkString(", "))
-      } else if (suppressedByPlugins.nonEmpty) {
-        Some("supressed by plugins: " + suppressedByPlugins.map(_.className).mkString(", "))
+      else if (implicitBehaviors.exists(_._1.suppressed)) {
+        val reasons = implicitBehaviors
+          .filter(_._1.suppressed)
+          .map { case (_, pl) => s"${pl.name} (${pl.className})" }
+
+        Some("suppressed by plugin: " + reasons.mkString(", "))
       } else None
 
     if (suppressImplicitsReason.nonEmpty) {
@@ -387,7 +388,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       return _serializers(task.implicitKey)
     }
 
-    searchImplicits(generationMode.appliedType(task.target)) match {
+    searchImplicits(generationMode.appliedType(task.target), implicitBehaviors.map(_._1)) match {
       case success: AssistedImplicits.SearchSuccess =>
         createHandle(task, task.implicitKey, ImplicitIdentity, simpleGen = true,
           q => generateImplicit(task, success)(using q).asTerm)

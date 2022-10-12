@@ -29,7 +29,6 @@ extends PluginContext with ModifierParserImpl with GenerationContextImpl with Ge
   protected var _pluginInstances: Set[Plugin] = Set.empty
   protected val _extensions: mutable.Map[Extensions.Key[_], Set[ExtensionRegistration[Any]]] = mutable.HashMap.empty
   protected val _modifiers: mutable.Map[String, PluginContainer] = mutable.HashMap.empty
-  protected var _implicitLocations: Set[q.reflect.Symbol] = Set.empty
 
   val report: ErrorReporting = ErrorReporting.fromQuotes
 
@@ -70,7 +69,6 @@ extends PluginContext with ModifierParserImpl with GenerationContextImpl with Ge
     _plugins.put(className, container)
     _pluginContainers += container
     _pluginInstances += instance
-    _implicitLocations ++= instance.implicitLocations
     for (mod <- container.supportedModifiers) _modifiers.put(mod, container)
     for ((k, vs) <- container.instance.extensions.untypedMap; v <- vs) {
       _extensions.put(k, _extensions.getOrElse(k, Set.empty) + ExtensionRegistration(className, instance, v))

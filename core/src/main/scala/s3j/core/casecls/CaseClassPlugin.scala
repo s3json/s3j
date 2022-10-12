@@ -7,7 +7,7 @@ import s3j.core.casecls.modifiers.{FieldCaseModifier, FieldKeyModifier, NullOpti
 import s3j.core.enums.modifiers.EnumCaseModifier
 import s3j.macros.GenerationContext.{GenerationOutcome, GenerationUnsupported}
 import s3j.macros.generic.Extensions
-import s3j.macros.modifiers.ModifierParser.{AnnotationModifier, StoredModifier}
+import s3j.macros.modifiers.ModifierParser.{AnnotationModifier, StoredModifier, TextModifier}
 import s3j.macros.modifiers.{Modifier, ModifierContext, ModifierParser, ModifierParsers, ModifierSet}
 import s3j.macros.{GenerationContext, Plugin, PluginContext}
 
@@ -22,24 +22,11 @@ class CaseClassPlugin extends Plugin {
     CaseClassExtension.key ~> new OptionExtension
   )
 
-  private def parseCaseConvention(cc: CaseConvention): PartialFunction[StoredModifier, Modifier] = {
-    case ann: AnnotationModifier =>
-      if (ann.context == ModifierContext.Enum || ann.context == ModifierContext.EnumCase)
-        EnumCaseModifier(cc)
-      else
-        FieldCaseModifier(cc)
-  }
-
   override def modifierParser(using PluginContext): ModifierParser = ModifierParser.builder
     .parse[allowUnknownKeys](UnknownKeysModifier(true))
     .parse[failUnknownKeys](UnknownKeysModifier(false))
     .parse[restFields](RestFieldsModifier)
     .parse[nullOption](NullOptionModifier)
-    .parseFn[capitalizedKebabCase](parseCaseConvention(CaseConvention.CapitalizedKebabCase))
-    .parseFn[kebabCase](parseCaseConvention(CaseConvention.KebabCase))
-    .parseFn[pascalCase](parseCaseConvention(CaseConvention.PascalCase))
-    .parseFn[screamingSnakeCase](parseCaseConvention(CaseConvention.ScreamingSnakeCase))
-    .parseFn[snakeCase](parseCaseConvention(CaseConvention.SnakeCase))
     .parseFn[key](ModifierParsers.parseString(FieldKeyModifier.apply))
     .build()
 

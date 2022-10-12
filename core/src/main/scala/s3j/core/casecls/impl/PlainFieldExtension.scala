@@ -4,6 +4,7 @@ import s3j.core.casecls.CaseClassContext.*
 import s3j.core.casecls.{CaseClassContext, CaseClassExtension}
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.codegen.Variable
+import s3j.macros.generic.GenerationConfidence
 import s3j.macros.traits.NestedResult
 
 import scala.annotation.threadUnsafe
@@ -44,7 +45,7 @@ private[casecls] class PlainFieldExtension extends CaseClassExtension {
   override def processField[T](using CaseClassContext)(field: FieldRequest[T])
                               (using Quotes, Type[T]): GenerationOutcome[T] =
     new GenerationCandidate[T] {
-      def confidence: Option[Int] = Some(0)
+      def confidence: GenerationConfidence = 0
       def result: ObjectField[T] = new ObjectFieldImpl[T](field)
     }
 }

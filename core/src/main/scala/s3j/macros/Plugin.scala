@@ -1,8 +1,8 @@
 package s3j.macros
 
 import s3j.annotations.usePlugin
-import s3j.macros.GenerationContext.{GenerationOutcome, GenerationUnsupported, GenerationRejection, GenerationCandidate}
-import s3j.macros.generic.Extensions
+import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, GenerationRejection, GenerationUnsupported}
+import s3j.macros.generic.{Extensions, ImplicitBehavior}
 import s3j.macros.modifiers.{ModifierParser, ModifierSet}
 
 import scala.quoted.{Quotes, Type}
@@ -25,14 +25,12 @@ abstract class Plugin {
   /** @return Plugin capabilities */
   def capabilities: Set[PluginCapability] = Set.empty
   
-  /** @return Extra locations to look for implicits (module symbols) */
-  def implicitLocations(using q: Quotes): Set[q.reflect.Symbol] = Set.empty
-  
   /** @return Modifier parser for this plugin */
   def modifierParser(using PluginContext): ModifierParser = ModifierParser.empty
   
-  /** @return Whether implicit search should be suppressed for this type */
-  def suppressImplicitSearch[T](modifiers: ModifierSet)(using Quotes, PluginContext, Type[T]): Boolean = false
+  /** @return Implicit search behavior for this type */
+  def implicitBehavior[T](modifiers: ModifierSet)(using Quotes, PluginContext, Type[T]): ImplicitBehavior =
+    ImplicitBehavior.Neutral
 
   /**
    * Perform generation for a type with specified modifiers. Plugin should decide whether it is able to perform that

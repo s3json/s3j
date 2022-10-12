@@ -1,6 +1,6 @@
 package s3j.macros
 
-import s3j.macros.generic.GenerationMode
+import s3j.macros.generic.{GenerationConfidence, GenerationMode}
 import s3j.macros.modifiers.ModifierSet
 import s3j.macros.traits.{BasicPluginContext, ErrorReporting, NestedBuilder, ReportingBuilder}
 import s3j.macros.utils.GenerationPath
@@ -32,11 +32,8 @@ object GenerationContext {
    * confidence is assigned to the result.
    */
   trait GenerationCandidate extends GenerationOutcome {
-    /**
-     * @return Confidence level of this candidate, or `None` is plugin is certain that candidate is the only
-     *         candidate that is possible (e.g. when plugin was explicitly selected by some modifier).
-     */
-    def confidence: Option[Int]
+    /** @return Confidence level of this candidate */
+    def confidence: GenerationConfidence
 
     /**
      * Generate serializer identity for deduplication. Note that identity should include only configuration data,

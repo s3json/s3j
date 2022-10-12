@@ -8,7 +8,7 @@ import s3j.io.{JsonReader, JsonToken, JsonWriter, KeyHandle}
 import s3j.macros.GenerationContext
 import s3j.macros.GenerationContext.GenerationCandidate
 import s3j.macros.codegen.{CodeUtils, Variable}
-import s3j.macros.generic.GenerationMode
+import s3j.macros.generic.{GenerationConfidence, GenerationMode}
 import s3j.macros.modifiers.ModifierSet
 
 import scala.quoted.{Expr, Quotes, Type, quotes}
@@ -100,7 +100,7 @@ private[casecls] class CaseClassGenerator[T](modifiers: ModifierSet)(using c: Ge
 
   val candidate: GenerationCandidate =
     new GenerationCandidate {
-      def confidence: Option[Int] = Some(500)
+      def confidence: GenerationConfidence = 500
       def identity: AnyRef = obj.result.identity
 
       // Quasiquotes were much better than _this_:

@@ -16,6 +16,7 @@ object ModifierParser {
     def context: ModifierContext
   }
 
+  /** Modifier stored as annotation */
   trait AnnotationModifier extends StoredModifier {
     /** Actual type of annotation */
     def annotation: Type[_ <: Annotation]
@@ -25,6 +26,12 @@ object ModifierParser {
 
     /** @return Arguments for annotation */
     def args: List[Expr[Any]]
+  }
+  
+  /** Modifier stored as text, e.g. in settings */
+  trait TextModifier extends StoredModifier {
+    /** @return Text content of the modifier */
+    def content: String
   }
 
   type ParseFunction = Quotes ?=> PartialFunction[StoredModifier, Modifier]
