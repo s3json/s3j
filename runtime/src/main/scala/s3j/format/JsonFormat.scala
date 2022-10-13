@@ -4,6 +4,14 @@ import s3j.io.{JsonReader, JsonWriter, ParseException}
 import scala.util.control.NonFatal
 
 object JsonFormat {
+  /**
+   * Generated codecs are materialized by macro engine without asking, meaning that every call site will get it's own
+   * JSON codec instance. Useful mostly in situations where JSON codec is a part of a larger type class, which is then
+   * derived explicitly by user. Otherwise using this type may lead to silent code bloat, generating huge classes over
+   * and over again.
+   */
+  trait Generated[T] { given codec: JsonFormat[T] }
+
   /** Combine [[JsonEncoder]] and [[JsonDecoder]] into single [[JsonFormat]] */
   def of[T](encoder: JsonEncoder[_ >: T], decoder: JsonDecoder[_ <: T]): JsonFormat[T] =
     new JsonFormat[T] {

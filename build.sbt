@@ -11,7 +11,7 @@ val commonSettings = Seq(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(runtime, core)
+  .aggregate(runtime, core, `interop-akka`)
   .settings(
     name := "s3j-root",
     publishArtifact := false,
@@ -34,6 +34,19 @@ lazy val core = (project in file("core"))
     libraryDependencies ++= Seq(
       "org.scala-lang" %% "scala3-compiler" % scalaVersion.value % Provided
     )
+  )
+
+lazy val `interop-akka` = (project in file("interop/akka"))
+  .dependsOn(runtime)
+  .settings(commonSettings)
+  .settings(
+    name := "s3j-akka",
+
+    libraryDependencies ++= Seq(
+      // Apache 2 licensed versions:
+      "com.typesafe.akka" %% "akka-stream" % "2.6.20",
+      "com.typesafe.akka" %% "akka-http" % "10.2.10"
+    ).map(_.cross(CrossVersion.for3Use2_13))
   )
 
 def exampleProject(exampleName: String): Project = Project("example-" + exampleName, file("examples/" + exampleName))

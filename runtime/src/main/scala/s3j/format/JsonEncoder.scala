@@ -2,8 +2,15 @@ package s3j.format
 
 import s3j.io.JsonWriter
 
-// Empty object is required so we could extend it later
-object JsonEncoder
+object JsonEncoder {
+  /**
+   * Generated codecs are materialized by macro engine without asking, meaning that every call site will get it's own
+   * JSON codec instance. Useful mostly in situations where JSON codec is a part of a larger type class, which is then
+   * derived explicitly by user. Otherwise using this type may lead to silent code bloat, generating huge classes over 
+   * and over again.
+   */
+  trait Generated[T] { given codec: JsonEncoder[T] }
+}
 
 trait JsonEncoder[T] { outer =>
   /** Encode value into supplied JsonWriter */
