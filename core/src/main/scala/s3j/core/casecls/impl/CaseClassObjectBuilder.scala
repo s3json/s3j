@@ -1,6 +1,5 @@
 package s3j.core.casecls.impl
 
-import s3j.annotations.naming.CaseConvention
 import s3j.core.casecls.CaseClassContext.*
 import s3j.core.casecls.{CaseClassContext, CaseClassExtension}
 import s3j.core.casecls.impl.CaseClassObjectBuilder.{FieldIdentity, ObjectIdentity, StackEntry}
@@ -9,6 +8,7 @@ import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.GenerationContext
 import s3j.macros.PluginContext.ExtensionRegistration
 import s3j.macros.codegen.{CodeUtils, Variable, Position as XPosition}
+import s3j.macros.generic.CaseConvention
 import s3j.macros.modifiers.ModifierSet
 import s3j.macros.traits.{ErrorReporting, ReportingBuilder}
 import s3j.macros.utils.{GenerationPath, ReportingUtils}
@@ -63,8 +63,10 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
      */
     val baseKey: String =
       ownModifiers.get(FieldKeyModifier.key).map(_.fieldKey).getOrElse {
-        val caseConv = inheritedModifiers.get(FieldCaseModifier.key).fold(CaseConvention.NoConvention)(_.value)
-        CaseConvention.transform(caseConv, ctorField.name)
+        inheritedModifiers
+          .get(FieldCaseModifier.key)
+          .fold(CaseConvention.NoConvention)(_.value)
+          .transform(ctorField.name)
       }
 
     val reportPosition: Option[XPosition] = ctorField.pos.map(XPosition.apply(_))

@@ -12,18 +12,18 @@ class MacroTest extends AnyFlatSpec with Matchers {
   it should "serialize simple classes" in {
     case class Test(x: String, y: String) derives JsonFormat
     Test("123", "qwe").toJsonString shouldBe "{\"x\":\"123\",\"y\":\"qwe\"}"
-    "{\"x\":\"xxx\",\"y\":\"yyy\"}".convertTo[Test] shouldBe Test("xxx", "yyy")
-    "{\"y\":\"YYY\",\"x\":\"XXX\"}".convertTo[Test] shouldBe Test("XXX", "YYY")
+    "{\"x\":\"xxx\",\"y\":\"yyy\"}".fromJson[Test] shouldBe Test("xxx", "yyy")
+    "{\"y\":\"YYY\",\"x\":\"XXX\"}".fromJson[Test] shouldBe Test("XXX", "YYY")
 
-    an [ParseException] shouldBe thrownBy { "{}".convertTo[Test] }
-    an [ParseException] shouldBe thrownBy { "{\"x\":\"\",\"y\":\"\",\"z\":\"123\"}".convertTo[Test] }
+    an [ParseException] shouldBe thrownBy { "{}".fromJson[Test] }
+    an [ParseException] shouldBe thrownBy { "{\"x\":\"\",\"y\":\"\",\"z\":\"123\"}".fromJson[Test] }
   }
 
   it should "serialize rest fields" in {
     case class Test(x: String, @restFields y: JsObject) derives JsonFormat
     Test("123", JsObject("f1" -> "123", "f2" -> 123)).toJsonString shouldBe "{\"x\":\"123\",\"f1\":\"123\",\"f2\":123}"
 
-    val r = "{\"f1\":123,\"x\":\"qqq\",\"f2\":456,\"f3\": true}".convertTo[Test]
+    val r = "{\"f1\":123,\"x\":\"qqq\",\"f2\":456,\"f3\": true}".fromJson[Test]
     r shouldBe Test("qqq", JsObject("f1" -> 123, "f2" -> 456, "f3" -> true))
     r.y.order shouldBe Seq("f1", "f2", "f3")
   }
@@ -32,7 +32,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     @allowUnknownKeys
     case class Test(x: String) derives JsonFormat
 
-    "{\"x\":\"123\",\"y\":\"123123\",\"z\":\"123\",\"w\":{\"x\":123,\"y\":true}}".convertTo[Test] shouldBe Test("123")
+    "{\"x\":\"123\",\"y\":\"123123\",\"z\":\"123\",\"w\":{\"x\":123,\"y\":true}}".fromJson[Test] shouldBe Test("123")
   }
 
   it should "serialize Option's" in {
@@ -41,9 +41,9 @@ class MacroTest extends AnyFlatSpec with Matchers {
     Test("123", None).toJsonString shouldBe "{\"x\":\"123\"}"
     Test("123", Some("456")).toJsonString shouldBe "{\"x\":\"123\",\"y\":\"456\"}"
 
-    "{\"x\":\"123\"}".convertTo[Test] shouldBe Test("123", None)
-    "{\"x\":\"123\",\"y\":null}".convertTo[Test] shouldBe Test("123", None)
-    "{\"y\":\"qqq\",\"x\":\"123\"}".convertTo[Test] shouldBe Test("123", Some("qqq"))
+    "{\"x\":\"123\"}".fromJson[Test] shouldBe Test("123", None)
+    "{\"x\":\"123\",\"y\":null}".fromJson[Test] shouldBe Test("123", None)
+    "{\"y\":\"qqq\",\"x\":\"123\"}".fromJson[Test] shouldBe Test("123", Some("qqq"))
   }
 
   it should "serialize Option's with @nullOption" in {
@@ -58,7 +58,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     case class Test(a: TestA, b: TestA) derives JsonFormat
 
     Test(TestA("123"), TestA("qwe")).toJsonString shouldBe "{\"a\":{\"x\":\"123\"},\"b\":{\"x\":\"qwe\"}}"
-    "{\"b\":{\"x\":\"a\"},\"a\":{\"x\":\"b\"}}".convertTo[Test] shouldBe Test(TestA("b"), TestA("a"))
+    "{\"b\":{\"x\":\"a\"},\"a\":{\"x\":\"b\"}}".fromJson[Test] shouldBe Test(TestA("b"), TestA("a"))
   }
 
   it should "serialize generic nested case classes" in {
@@ -68,7 +68,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     Test(TestA("qwe"), TestA(TestA("asd"))).toJsonString shouldBe
       "{\"a\":{\"x\":\"qwe\"},\"b\":{\"x\":{\"x\":\"asd\"}}}"
 
-    "{\"a\":{\"x\":\"qwe\"},\"b\":{\"x\":{\"x\":\"asd\"}}}".convertTo[Test] shouldBe
+    "{\"a\":{\"x\":\"qwe\"},\"b\":{\"x\":{\"x\":\"asd\"}}}".fromJson[Test] shouldBe
       Test(TestA("qwe"), TestA(TestA("asd")))
   }
 
@@ -77,7 +77,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     derives JsonFormat
 
     Test("123", "456", "789").toJsonString shouldBe "{\"mew\":\"123\",\"meow_oink\":\"456\",\"Bark-Honk\":\"789\"}"
-    "{\"mew\":\"XXX\",\"meow_oink\":\"YYY\",\"Bark-Honk\":\"ZZZ\"}".convertTo[Test] shouldBe Test("XXX", "YYY", "ZZZ")
+    "{\"mew\":\"XXX\",\"meow_oink\":\"YYY\",\"Bark-Honk\":\"ZZZ\"}".fromJson[Test] shouldBe Test("XXX", "YYY", "ZZZ")
   }
 
   it should "recognize global annotations for case convention" in {
@@ -90,7 +90,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     import TestW.*
 
     Test("123", TestA("xyz")).toJsonString shouldBe "{\"MEOW_OINK\":\"123\",\"BARK_HONK\":{\"SOME_KEY\":\"xyz\"}}"
-    "{\"MEOW_OINK\":\"A\",\"BARK_HONK\":{\"SOME_KEY\":\"B\"}}".convertTo[Test] shouldBe Test("A", TestA("B"))
+    "{\"MEOW_OINK\":\"A\",\"BARK_HONK\":{\"SOME_KEY\":\"B\"}}".fromJson[Test] shouldBe Test("A", TestA("B"))
   }
 
   it should "serialize stringy enums" in {
@@ -100,10 +100,10 @@ class MacroTest extends AnyFlatSpec with Matchers {
     }
 
     Test.Meow.toJsonString shouldBe "\"Meow\""
-    "\"Bark\"".convertTo[Test] shouldBe Test.Bark
+    "\"Bark\"".fromJson[Test] shouldBe Test.Bark
 
     an [ParseException] shouldBe thrownBy {
-      "\"Oink\"".convertTo[Test]
+      "\"Oink\"".fromJson[Test]
     }
   }
 
@@ -123,9 +123,9 @@ class MacroTest extends AnyFlatSpec with Matchers {
     Test.BarkHonk.toJsonString shouldBe "\"bark!honk\""
     Test.QuackQuack.toJsonString shouldBe "\"Quack-Quack\""
 
-    "\"MEOW_OINK\"".convertTo[Test] shouldBe Test.MeowOink
-    "\"bark!honk\"".convertTo[Test] shouldBe Test.BarkHonk
-    "\"Quack-Quack\"".convertTo[Test] shouldBe Test.QuackQuack
+    "\"MEOW_OINK\"".fromJson[Test] shouldBe Test.MeowOink
+    "\"bark!honk\"".fromJson[Test] shouldBe Test.BarkHonk
+    "\"Quack-Quack\"".fromJson[Test] shouldBe Test.QuackQuack
   }
 
   it should "serialize parametrized enums" in {
@@ -139,9 +139,9 @@ class MacroTest extends AnyFlatSpec with Matchers {
     Test.B("x", "y").toJsonString shouldBe "{\"type\":\"B\",\"y\":\"x\",\"z\":\"y\"}"
     Test.C.toJsonString shouldBe "{\"type\":\"C\"}"
 
-    "{\"type\":\"A\",\"x\":\"xx\"}".convertTo[Test] shouldBe Test.A("xx")
-    "{\"type\":\"B\",\"y\":\"1\",\"z\":\"2\"}".convertTo[Test] shouldBe Test.B("1", "2")
-    "{\"type\":\"C\"}".convertTo[Test] shouldBe Test.C
+    "{\"type\":\"A\",\"x\":\"xx\"}".fromJson[Test] shouldBe Test.A("xx")
+    "{\"type\":\"B\",\"y\":\"1\",\"z\":\"2\"}".fromJson[Test] shouldBe Test.B("1", "2")
+    "{\"type\":\"C\"}".fromJson[Test] shouldBe Test.C
   }
 
   it should "fail on out-of-order discriminator if no @allowBuffering is set" in {
@@ -150,10 +150,10 @@ class MacroTest extends AnyFlatSpec with Matchers {
       case B
     }
 
-    "{\"type\":\"A\",\"x\":\"1\"}".convertTo[Test] shouldBe Test.A("1")
+    "{\"type\":\"A\",\"x\":\"1\"}".fromJson[Test] shouldBe Test.A("1")
 
     a [ParseException] shouldBe thrownBy {
-      "{\"x\":\"1\",\"type\":\"A\"}".convertTo[Test]
+      "{\"x\":\"1\",\"type\":\"A\"}".fromJson[Test]
     }
   }
 
@@ -164,7 +164,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
       case B
     }
 
-    "{\"x\":\"1\",\"type\":\"A\"}".convertTo[Test] shouldBe Test.A("1")
+    "{\"x\":\"1\",\"type\":\"A\"}".fromJson[Test] shouldBe Test.A("1")
   }
 
   it should "fail on extra fields in singleton enum cases" in {
@@ -173,10 +173,10 @@ class MacroTest extends AnyFlatSpec with Matchers {
       case B(x: String) // to force objects
     }
 
-    "{\"type\":\"A\"}".convertTo[Test] shouldBe Test.A
+    "{\"type\":\"A\"}".fromJson[Test] shouldBe Test.A
 
     a [ParseException] shouldBe thrownBy {
-      "{\"type\":\"A\",\"x\":\"1\"}".convertTo[Test]
+      "{\"type\":\"A\",\"x\":\"1\"}".fromJson[Test]
     }
   }
 
@@ -187,8 +187,8 @@ class MacroTest extends AnyFlatSpec with Matchers {
       case B(x: String) // to force objects
     }
 
-    "{\"type\":\"A\"}".convertTo[Test] shouldBe Test.A
-    "{\"type\":\"A\",\"x\":\"1\"}".convertTo[Test]
+    "{\"type\":\"A\"}".fromJson[Test] shouldBe Test.A
+    "{\"type\":\"A\",\"x\":\"1\"}".fromJson[Test]
   }
 
   it should "respect @stringyCases annotation" in {
@@ -220,10 +220,10 @@ class MacroTest extends AnyFlatSpec with Matchers {
     }
 
     Test.A("123").toJsonString shouldBe "{\"mew\":\"A\",\"x\":\"123\"}"
-    "{\"mew\":\"A\",\"x\":\"X\"}".convertTo[Test] shouldBe Test.A("X")
+    "{\"mew\":\"A\",\"x\":\"X\"}".fromJson[Test] shouldBe Test.A("X")
 
     Test.B.toJsonString shouldBe "{\"mew\":\"X\"}"
-    "{\"mew\":\"X\"}".convertTo[Test] shouldBe Test.B
+    "{\"mew\":\"X\"}".fromJson[Test] shouldBe Test.B
   }
 
   it should "generate generic sealed hierarchies" in {
@@ -234,8 +234,8 @@ class MacroTest extends AnyFlatSpec with Matchers {
     TestA("1").toJsonString shouldBe "{\"type\":\"TestA\",\"x\":\"1\"}"
     TestB("2").toJsonString shouldBe "{\"type\":\"TestB\",\"y\":\"2\"}"
 
-    "{\"type\":\"TestA\",\"x\":\"X\"}".convertTo[Test] shouldBe TestA("X")
-    "{\"type\":\"TestB\",\"y\":\"Y\"}".convertTo[Test] shouldBe TestB("Y")
+    "{\"type\":\"TestA\",\"x\":\"X\"}".fromJson[Test] shouldBe TestA("X")
+    "{\"type\":\"TestB\",\"y\":\"Y\"}".fromJson[Test] shouldBe TestB("Y")
   }
 
   it should "serialize collections" in {
@@ -243,7 +243,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     Test(123, Seq(Test(456, Nil), Test(789, Seq(Test(0, Nil))))).toJsonString shouldBe
       "{\"a\":123,\"b\":[{\"a\":456,\"b\":[]},{\"a\":789,\"b\":[{\"a\":0,\"b\":[]}]}]}"
 
-    "{\"a\":123,\"b\":[{\"a\":456,\"b\":[]}]}".convertTo[Test] shouldBe Test(123, Seq(Test(456, Nil)))
+    "{\"a\":123,\"b\":[{\"a\":456,\"b\":[]}]}".fromJson[Test] shouldBe Test(123, Seq(Test(456, Nil)))
   }
 
   it should "serialize maps" in {
@@ -253,7 +253,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     Test(Map("mew" -> TestA(123), "bark" -> TestA(456))).toJsonString shouldBe
       "{\"a\":{\"mew\":{\"a\":123},\"bark\":{\"a\":456}}}"
 
-    "{\"a\":{\"mew\":{\"a\":0},\"bark\":{\"a\":1}}}".convertTo[Test] shouldBe
+    "{\"a\":{\"mew\":{\"a\":0},\"bark\":{\"a\":1}}}".fromJson[Test] shouldBe
       Test(Map("mew" -> TestA(0), "bark" -> TestA(1)))
   }
 

@@ -102,6 +102,7 @@ class AstJsonWriter extends JsonWriter {
   }
 
   def longValue(value: Long, unsigned: Boolean = false): JsonWriter = {
+    stateMachine.value()
     if (unsigned) state.pushValue(JsBigInt(BigInt(java.lang.Long.toUnsignedString(value, 10))))
     else state.pushValue(JsLong(value))
     this

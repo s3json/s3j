@@ -27,10 +27,10 @@ object IoExtensions {
   }
   
   extension (str: String) {
-    def convertTo[T](using dec: JsonDecoder[_ <: T]): T = dec.decode(new StreamJsonReader(new StringReader(str)))
+    def fromJson[T](using dec: JsonDecoder[_ <: T]): T = dec.decode(new StreamJsonReader(new StringReader(str)))
   }
   
   extension (reader: Reader) {
-    def convertTo[T](using dec: JsonDecoder[_ <: T]): T = dec.decode(new StreamJsonReader(reader))
+    def fromJson[T](using dec: JsonDecoder[_ <: T]): T = dec.decode(new StreamJsonReader(reader))
   }
 }

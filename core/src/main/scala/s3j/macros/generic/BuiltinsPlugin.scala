@@ -36,7 +36,7 @@ class BuiltinsPlugin extends Plugin {
   }
 
   private def parseCaseConvention(name: String): CaseConvention =
-    CaseConvention.transform(CaseConvention.PascalCase, name) match {
+    CaseConvention.PascalCase.transform(name) match {
       case "NoConvention"         => CaseConvention.NoConvention
       case "CamelCase"            => CaseConvention.CamelCase
       case "SnakeCase"            => CaseConvention.SnakeCase
@@ -51,7 +51,8 @@ class BuiltinsPlugin extends Plugin {
     case ann: AnnotationModifier =>
       import q.reflect.*
       ann.args.head.asTerm match {
-        case Select(Ident("CaseConvention"), sel) => f(parseCaseConvention(sel))
+        case Select(Ident(_), name)         => f(parseCaseConvention(name))
+        case Literal(StringConstant(name))  => f(parseCaseConvention(name))
         case other => throw new IllegalArgumentException("Unmatched case convention tree: " +
           other.show(using Printer.TreeStructure))
       }
@@ -65,6 +66,7 @@ class BuiltinsPlugin extends Plugin {
     .parseFn[capitalizedKebabCase](parseCaseConvention(CaseConvention.CapitalizedKebabCase))
     .parseFn[kebabCase](parseCaseConvention(CaseConvention.KebabCase))
     .parseFn[pascalCase](parseCaseConvention(CaseConvention.PascalCase))
+    .parseFn[camelCase](parseCaseConvention(CaseConvention.CamelCase))
     .parseFn[screamingSnakeCase](parseCaseConvention(CaseConvention.ScreamingSnakeCase))
     .parseFn[snakeCase](parseCaseConvention(CaseConvention.SnakeCase))
     .parseFn[defaultFieldCase](parseAnyConvention(FieldCaseModifier(_)))

@@ -7,7 +7,43 @@ import s3j.io.{JsonReader, JsonToken, JsonWriter}
 
 import java.util.UUID
 
-object BasicFormats {
+trait LowPriorityBasicFormats {
+  /** Format for parsing arbitrary JSON data, restricted to objects */
+  given jsObjectFormat: JsonFormat[JsObject] with {
+    def encode(writer: JsonWriter, value: JsObject): Unit = JsValueFormat.encode(writer, value)
+
+    def decode(reader: JsonReader): JsObject = reader match {
+      case reader: JsonReader.Buffered => reader.readValue() match {
+        case obj: JsObject => obj
+        case other => reader.parseError("expected object, got " + other.typeName)
+      }
+
+      case _ => reader.peekToken match {
+        case JsonToken.TObjectStart => JsValueFormat.decodeStream(reader).asInstanceOf[JsObject]
+        case other => DecoderUtils.throwUnexpected(reader, "object", other)
+      }
+    }
+  }
+
+  /** Format for parsing arbitrary JSON data, restricted to arrays */
+  given jsArrayFormat: JsonFormat[JsArray] with {
+    def encode(writer: JsonWriter, value: JsArray): Unit = JsValueFormat.encode(writer, value)
+
+    def decode(reader: JsonReader): JsArray = reader match {
+      case reader: JsonReader.Buffered => reader.readValue() match {
+        case arr: JsArray => arr
+        case other => reader.parseError("expected array, got " + other.typeName)
+      }
+
+      case _ => reader.peekToken match {
+        case JsonToken.TArrayStart => JsValueFormat.decodeStream(reader).asInstanceOf[JsArray]
+        case other => DecoderUtils.throwUnexpected(reader, "array", other)
+      }
+    }
+  }
+}
+
+object BasicFormats extends LowPriorityBasicFormats {
   given booleanFormat: JsonFormat[Boolean] with {
     def encode(writer: JsonWriter, value: Boolean): Unit = writer.boolValue(value)
     def decode(reader: JsonReader): Boolean = reader.nextToken() match {
@@ -58,36 +94,4 @@ object BasicFormats {
 
   /** Format for parsing arbitrary JSON data as [[JsValue]] */
   given jsValueFormat: JsonFormat[JsValue] = JsValueFormat
-
-  /** Format for parsing arbitrary JSON data, restricted to objects */
-  given jsObjectFormat: JsonFormat[JsObject] with {
-    def encode(writer: JsonWriter, value: JsObject): Unit = JsValueFormat.encode(writer, value)
-    def decode(reader: JsonReader): JsObject = reader match {
-      case reader: JsonReader.Buffered => reader.readValue() match {
-        case obj: JsObject => obj
-        case other => reader.parseError("expected object, got " + other.typeName)
-      }
-
-      case _ => reader.peekToken match {
-        case JsonToken.TObjectStart => JsValueFormat.decodeStream(reader).asInstanceOf[JsObject]
-        case other => DecoderUtils.throwUnexpected(reader, "object", other)
-      }
-    }
-  }
-
-  /** Format for parsing arbitrary JSON data, restricted to arrays */
-  given jsArrayFormat: JsonFormat[JsArray] with {
-    def encode(writer: JsonWriter, value: JsArray): Unit = JsValueFormat.encode(writer, value)
-    def decode(reader: JsonReader): JsArray = reader match {
-      case reader: JsonReader.Buffered => reader.readValue() match {
-        case arr: JsArray => arr
-        case other => reader.parseError("expected array, got " + other.typeName)
-      }
-
-      case _ => reader.peekToken match {
-        case JsonToken.TArrayStart => JsValueFormat.decodeStream(reader).asInstanceOf[JsArray]
-        case other => DecoderUtils.throwUnexpected(reader, "array", other)
-      }
-    }
-  }
 }

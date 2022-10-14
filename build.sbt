@@ -11,7 +11,7 @@ val commonSettings = Seq(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(runtime, core, `interop-akka`)
+  .aggregate(runtime, core, `interop-akka`, `interop-jooq`, `interop-sbt`)
   .settings(
     name := "s3j-root",
     publishArtifact := false,
@@ -47,6 +47,32 @@ lazy val `interop-akka` = (project in file("interop/akka"))
       "com.typesafe.akka" %% "akka-stream" % "2.6.20",
       "com.typesafe.akka" %% "akka-http" % "10.2.10"
     ).map(_.cross(CrossVersion.for3Use2_13))
+  )
+
+lazy val `interop-jooq` = (project in file("interop/jooq"))
+  .dependsOn(runtime, core % Test)
+  .settings(commonSettings)
+  .settings(
+    name := "s3j-jooq",
+
+    libraryDependencies ++= Seq(
+      "org.jooq" % "jooq" % "3.17.4",
+      "org.testcontainers" % "postgresql" % "1.17.5" % Test,
+      "org.postgresql" % "postgresql" % "42.5.0" % Test
+    )
+  )
+
+lazy val `interop-sbt` = (project in file("interop/sbt-plugin"))
+  .enablePlugins(BuildInfoPlugin, SbtPlugin)
+  .settings(
+    name := "s3j-sbt",
+
+    scalaVersion := "2.12.16",
+    crossScalaVersions := Seq(scalaVersion.value),
+
+    buildInfoKeys := Seq(organization, version),
+    buildInfoPackage := "s3j",
+    buildInfoObject := "S3jBuildInfo"
   )
 
 def exampleProject(exampleName: String): Project = Project("example-" + exampleName, file("examples/" + exampleName))
