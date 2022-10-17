@@ -33,7 +33,8 @@ sealed trait JsValue {
   override def toString: String = this.toJsonString
 }
 
-case object JsNull extends JsValue {
+sealed trait JsNull extends JsValue
+case object JsNull extends JsNull {
   def typeName: String = "null"
 }
 

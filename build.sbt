@@ -72,7 +72,8 @@ lazy val `interop-sbt` = (project in file("interop/sbt-plugin"))
 
     buildInfoKeys := Seq(organization, version),
     buildInfoPackage := "s3j",
-    buildInfoObject := "S3jBuildInfo"
+    buildInfoObject := "S3jBuildInfo",
+    buildInfoOptions += BuildInfoOption.PackagePrivate
   )
 
 def exampleProject(exampleName: String): Project = Project("example-" + exampleName, file("examples/" + exampleName))
