@@ -32,7 +32,9 @@ object JsonMacros {
     val effectiveModifiers = ctx.symbolModifiers(ctx.typeSymbol).inherited ++
       ctx.symbolModifiers(Symbol.spliceOwner).own
 
-    val r = ctx.buildFinalBlock(() => ctx.generateRoot(TypeRepr.of(using ctx.generatedType), effectiveModifiers))
+    val root = ctx.generateRoot(TypeRepr.of(using ctx.generatedType), effectiveModifiers)
+    val r = ctx.buildResult(root)
+    
     if (ctx.inspectCode) {
       report.errorAndAbort("\u001b[1;32mGenerated code (@inspectCode annotation):\u001b[0m " +
         r.show(using Printer.TreeAnsiCode))

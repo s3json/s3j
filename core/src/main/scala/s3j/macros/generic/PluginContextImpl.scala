@@ -1,17 +1,19 @@
 package s3j.macros.generic
 
 import s3j.macros.PluginContext.ExtensionRegistration
-import s3j.macros.{Plugin, PluginCapability, PluginContext}
+import s3j.macros.{FreshPluginContext, Plugin, PluginCapability, PluginContext}
 import s3j.macros.modifiers.{Modifier, ModifierParser}
 import s3j.macros.traits.ErrorReporting
 import s3j.macros.utils.{MacroUtils, QualifiedName, ReportingUtils}
 
 import scala.collection.mutable
+import scala.quoted.runtime.impl.QuotesImpl
 import scala.quoted.{Quotes, Type}
 import scala.util.control.NonFatal
 
 private[macros] class PluginContextImpl[Q <: Quotes](using val q: Q)(val _generatedType: q.reflect.TypeRepr)
-extends PluginContext with ModifierParserImpl with GenerationContextImpl with GenerationStateImpl {
+extends FreshPluginContext with ModifierParserImpl with GenerationContextImpl with GenerationStateImpl {
+  protected val qi: QuotesImpl & q.type = q.asInstanceOf[QuotesImpl & q.type]
   import q.reflect.*
 
   protected class PluginContainer(val className: String, val instance: Plugin) {
@@ -38,8 +40,6 @@ extends PluginContext with ModifierParserImpl with GenerationContextImpl with Ge
   
   val inspectCode: Boolean = typeSymbol.annotations.map(parseAnnotation)
     .exists(_.fullName == "s3j.annotations.inspectCode")
-
-  private var _termCounter: Int = 0
 
   def loadPlugin(className: String): Unit = {
     if (_plugins.contains(className)) {
@@ -82,12 +82,4 @@ extends PluginContext with ModifierParserImpl with GenerationContextImpl with Ge
 
   def extensions[T](key: Extensions.Key[T]): Set[ExtensionRegistration[T]] =
     _extensions.getOrElse(key, Set.empty).asInstanceOf[Set[ExtensionRegistration[T]]]
-
-  def freshName(name: String): String = {
-    val r = name + "$s3j_" + _termCounter
-    _termCounter += 1
-    r
-  }
-
-  def freshName(): String = freshName("macro")
 }

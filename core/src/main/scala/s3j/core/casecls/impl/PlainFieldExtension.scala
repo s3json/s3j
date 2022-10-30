@@ -5,6 +5,7 @@ import s3j.core.casecls.{CaseClassContext, CaseClassExtension}
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.codegen.Variable
 import s3j.macros.generic.GenerationConfidence
+import s3j.macros.schema.SchemaExpr
 import s3j.macros.traits.NestedResult
 
 import scala.annotation.threadUnsafe
@@ -39,6 +40,16 @@ private[casecls] class PlainFieldExtension extends CaseClassExtension {
 
         def decodeFinal()(using Quotes): Expr[Any] = env.checkRequiredKey(field.key)
         def decodeResult()(using Quotes): Expr[Any] = result.value
+      }
+
+    /** @return Generated schemas for the field */
+    def generateSchema(using Quotes): SchemaCode =
+      new SchemaCode {
+        def requiredKeys: Set[String] = Set(field.key)
+        def keyOrdering: Seq[String] = Seq(field.key)
+        def key(key: String): SchemaExpr[?] = nested.schema
+        def dynamicKey: Option[SchemaExpr[Any]] = None
+        def dynamicKeyNames: Option[SchemaExpr[String]] = None
       }
   }
 

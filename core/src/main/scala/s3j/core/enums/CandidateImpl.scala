@@ -11,6 +11,7 @@ import s3j.macros.GenerationContext.GenerationCandidate
 import s3j.macros.codegen.{CodeUtils, Variable}
 import s3j.macros.generic.GenerationConfidence
 import s3j.macros.modifiers.ModifierSet
+import s3j.macros.schema.SchemaExpr
 import s3j.macros.traits.NestedResult
 
 import scala.annotation.threadUnsafe
@@ -208,4 +209,6 @@ extends GenerationCandidate {
     encoder = generateEncoder _,
     decoder = generateDecoder _
   )
+
+  def generateSchema(using Quotes)(): SchemaExpr[Any] = ???
 }

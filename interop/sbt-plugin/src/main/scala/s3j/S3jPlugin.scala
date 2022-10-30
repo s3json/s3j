@@ -5,7 +5,7 @@ import sbt._
 
 object S3jPlugin extends AutoPlugin {
   object autoImport extends S3jKeys {
-    val s3jModule: S3jModule.modules.type = S3jModule.modules
+    val s3j: S3jConstants.type = S3jConstants
   }
   
   import autoImport._

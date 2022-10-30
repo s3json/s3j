@@ -1,6 +1,7 @@
 package s3j.macros.codegen
 
 import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat, StringyDecoder, StringyEncoder, StringyFormat}
+import s3j.schema.JsonSchema
 
 import scala.annotation.compileTimeOnly
 
@@ -33,5 +34,10 @@ object AssistedHelpers {
     given $assistedStringyFormat[T]: StringyFormat[T] = compileTime
   }
 
+  object Schema {
+    @compileTimeOnly("assistedSearch placeholder")
+    given $assistedSchema[T]: JsonSchema[T] = compileTime
+  }
+  
   private def compileTime: Nothing = throw new RuntimeException("Compile time only")
 }

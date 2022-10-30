@@ -2,14 +2,13 @@ package s3j.macros.traits
 
 import s3j.macros.Plugin
 import s3j.macros.PluginContext.{ExtensionRegistration, SymbolModifiers}
-import s3j.macros.codegen.NameGenerator
 import s3j.macros.generic.{Extensions, GenerationMode}
 import s3j.macros.utils.QualifiedName
 
 import scala.quoted.Quotes
 
 /** Basic plugin context methods to use in generation contexts */
-trait BasicPluginContext extends NameGenerator {
+trait BasicPluginContext {
   /** @return Generation mode decoded from requested type class */
   def generationMode: GenerationMode
 

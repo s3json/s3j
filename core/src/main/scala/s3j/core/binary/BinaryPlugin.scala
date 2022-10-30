@@ -5,6 +5,7 @@ import s3j.format.impl.{BinaryEncoding, BinaryFormats}
 import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, GenerationRejection, GenerationUnsupported}
 import s3j.macros.generic.{GenerationConfidence, ImplicitBehavior}
 import s3j.macros.modifiers.{ModifierParser, ModifierSet}
+import s3j.macros.schema.SchemaExpr
 import s3j.macros.{GenerationContext, Plugin, PluginContext}
 
 import scala.quoted.runtime.impl.TypeImpl
@@ -46,6 +47,8 @@ class BinaryPlugin extends Plugin {
             val fmt = modifiers(BinaryFormatModifier.key).format
             fn(fmt.fn)
           }
+
+          def generateSchema(using Quotes)(): SchemaExpr[Any] = ???
         }
 
       case None => GenerationUnsupported

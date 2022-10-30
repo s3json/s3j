@@ -10,13 +10,18 @@ val commonSettings = Seq(
   Compile / scalacOptions ++= Seq("-Xcheck-macros"),
 )
 
+val notPublished = Seq(
+  publishArtifact := false,
+  publishTo := None,
+  publish := {},
+  publishLocal := {}
+)
+
 lazy val root = (project in file("."))
-  .aggregate(runtime, core, `interop-akka`, `interop-jooq`, `interop-sbt`)
+  .aggregate(runtime, schema, core, `interop-akka`, `interop-jooq`, `interop-sbt`)
+  .settings(notPublished)
   .settings(
-    name := "s3j-root",
-    publishArtifact := false,
-    publish := {},
-    publishLocal := {}
+    name := "s3j-root"
   )
 
 lazy val runtime = (project in file("runtime"))
@@ -25,8 +30,26 @@ lazy val runtime = (project in file("runtime"))
     name := "s3j-runtime"
   )
 
-lazy val core = (project in file("core"))
+lazy val `core-internal` = (project in file("core-internal"))
   .dependsOn(runtime)
+  .settings(commonSettings, notPublished)
+  .settings(
+    name := "s3j-core-internal",
+
+    libraryDependencies ++= Seq(
+      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value % Provided
+    )
+  )
+
+lazy val schema = (project in file("schema"))
+  .dependsOn(runtime, `core-internal` % Provided)
+  .settings(commonSettings)
+  .settings(
+    name := "s3j-schema"
+  )
+
+lazy val core = (project in file("core"))
+  .dependsOn(runtime, schema % Provided)
   .settings(commonSettings)
   .settings(
     name := "s3j",
@@ -85,4 +108,4 @@ def exampleProject(exampleName: String): Project = Project("example-" + exampleN
     publishTo := None
   )
 
-lazy val exampleCustomPlugin = exampleProject("custom-plugin")
+lazy val exampleCustomPlugin = exampleProject("custom-plugin").dependsOn(schema)

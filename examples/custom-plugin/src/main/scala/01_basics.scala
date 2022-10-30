@@ -7,6 +7,7 @@ import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, Gen
 import s3j.macros.codegen.PluginUtils
 import s3j.macros.generic.{GenerationConfidence, ImplicitBehavior}
 import s3j.macros.modifiers.{Modifier, ModifierKey, ModifierParser, ModifierSet}
+import s3j.macros.schema.SchemaExpr
 
 import scala.quoted.{Expr, Quotes, Type, quotes}
 
@@ -41,6 +42,7 @@ class MeowingPlugin extends Plugin {
       def confidence: GenerationConfidence = GenerationConfidence.Certain
       def identity: AnyRef = MeowingIdentity
       def generate(using Quotes)(): Expr[Any] = '{ MeowingRuntime.meowingCodec }
+      def generateSchema(using Quotes)(): SchemaExpr[Any] = ???
       override def simpleGeneration: Boolean = true
     }
   }

@@ -12,12 +12,14 @@ object Extensions {
   }
 
   /** Typed extension key. Always has an identity equality semantics, name serves only for debugging */
-  final class Key[T](val name: String) {
+  class Key[T](val name: String) {
     /** @return a typed pair for insertion into extension map */
     @targetName("makePair")
     def ~>(value: T): TypedPair[T] = TypedPair(this, value)
 
-    override def toString: String = name
+    override final def hashCode(): Int = super.hashCode()
+    override final def equals(x: Any): Boolean = super.equals(x)
+    override final def toString: String = name
   }
 
   val empty: Extensions = new Extensions(Map.empty)

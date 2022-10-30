@@ -18,7 +18,8 @@ class BuiltinsPlugin extends Plugin {
     import quotes.reflect.*
     ImplicitBehavior.Extend(
       Symbol.requiredModule("s3j.format.BasicFormats"),
-      Symbol.requiredModule("s3j.format.CollectionFormats")
+      Symbol.requiredModule("s3j.format.CollectionFormats"),
+      Symbol.requiredModule("s3j.schema.BasicSchemas")
     )
   }
 

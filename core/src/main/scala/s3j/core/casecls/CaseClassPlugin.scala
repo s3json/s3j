@@ -2,7 +2,7 @@ package s3j.core.casecls
 
 import s3j.annotations.naming.*
 import s3j.annotations.{allowUnknownKeys, failUnknownKeys, key, nullOption, restFields}
-import s3j.core.casecls.impl.{CaseClassGenerator, OptionExtension, PlainFieldExtension, RestFieldsExtension}
+import s3j.core.casecls.impl.{CaseClassCandidate, OptionExtension, PlainFieldExtension, RestFieldsExtension}
 import s3j.core.casecls.modifiers.{FieldCaseModifier, FieldKeyModifier, NullOptionModifier, RestFieldsModifier, UnknownKeysModifier}
 import s3j.core.enums.modifiers.EnumCaseModifier
 import s3j.macros.GenerationContext.{GenerationOutcome, GenerationUnsupported}
@@ -17,9 +17,9 @@ class CaseClassPlugin extends Plugin {
   def name: String = "Case class plugin"
 
   override def extensions: Extensions = Extensions(
-    CaseClassExtension.key ~> new PlainFieldExtension,
-    CaseClassExtension.key ~> new RestFieldsExtension,
-    CaseClassExtension.key ~> new OptionExtension
+    CaseClassExtension ~> new PlainFieldExtension,
+    CaseClassExtension ~> new RestFieldsExtension,
+    CaseClassExtension ~> new OptionExtension
   )
 
   override def modifierParser(using PluginContext): ModifierParser = ModifierParser.builder
@@ -33,7 +33,7 @@ class CaseClassPlugin extends Plugin {
   override def generate[T](modifiers: ModifierSet)(using Quotes, GenerationContext, Type[T]): GenerationOutcome = {
     import quotes.reflect.*
     val sym = TypeRepr.of[T].typeSymbol
-    if (sym.isClassDef && sym.flags.is(Flags.Case)) new CaseClassGenerator[T](modifiers).candidate
+    if (sym.isClassDef && sym.flags.is(Flags.Case)) new CaseClassCandidate[T](modifiers).candidate
     else GenerationUnsupported
   }
 }

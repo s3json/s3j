@@ -87,6 +87,8 @@ object CodeUtils {
 
     case GenerationMode.StringDecoder | GenerationMode.StringEncoder | GenerationMode.StringFormat =>
       throw new IllegalArgumentException("Stringy generation modes are not supported by makeCodec")
+
+    case GenerationMode.Schema => throw new IllegalArgumentException("Schema generation is not supported by makeCodec")
   }
 
   /** Build a hash-code based string match code */
@@ -96,7 +98,7 @@ object CodeUtils {
     caseEquals: Quotes ?=> T => Expr[Boolean],
     caseCode: Quotes ?=> T => Expr[Any],
     fallbackCode: Quotes ?=> Expr[Any]
-  )(using Quotes, NameGenerator): Expr[Any] = {
+  )(using Quotes): Expr[Any] = {
     val matched: Variable[Boolean] = Variable.create("matched")('{ false })
     val sortedCases = cases.toVector.sortBy(caseHash)
 

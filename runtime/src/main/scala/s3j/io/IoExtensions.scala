@@ -8,11 +8,7 @@ import java.io.{Reader, StringReader, StringWriter}
 object IoExtensions {
   extension [T](obj: T)(using enc: JsonEncoder[_ >: T]) {
     /** @return Object serialized as JsValue */
-    def toJsonValue: JsValue = {
-      val writer = new AstJsonWriter
-      enc.encode(writer, obj)
-      writer.result()
-    }
+    def toJsonValue: JsValue = enc.encodeValue(obj)
 
     /** @return Object serialized as compact JSON string */
     def toJsonString: String = toJsonString(0)

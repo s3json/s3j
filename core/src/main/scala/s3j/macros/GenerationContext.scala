@@ -2,6 +2,7 @@ package s3j.macros
 
 import s3j.macros.generic.{GenerationConfidence, GenerationMode}
 import s3j.macros.modifiers.ModifierSet
+import s3j.macros.schema.SchemaExpr
 import s3j.macros.traits.{BasicPluginContext, ErrorReporting, NestedBuilder, ReportingBuilder}
 import s3j.macros.utils.GenerationPath
 
@@ -48,6 +49,9 @@ object GenerationContext {
 
     /** @return Actual generated code for serializer */
     def generate(using Quotes)(): Expr[Any]
+
+    /** @return Generated JSON schema for serializer */
+    def generateSchema(using Quotes)(): SchemaExpr[?]
 
     /** @return Whether generated code is something simple, and recursive wrapper could be avoided for it */
     def simpleGeneration: Boolean = false

@@ -10,6 +10,7 @@ import s3j.macros.PluginContext.ExtensionRegistration
 import s3j.macros.codegen.{CodeUtils, Variable, Position as XPosition}
 import s3j.macros.generic.CaseConvention
 import s3j.macros.modifiers.ModifierSet
+import s3j.macros.schema.SchemaExpr
 import s3j.macros.traits.{ErrorReporting, ReportingBuilder}
 import s3j.macros.utils.{GenerationPath, ReportingUtils}
 
@@ -95,12 +96,12 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
     .zipWithIndex.flatMap { case (xs, i) => xs.filterNot(_.isTypeParam).map(new FieldImpl(_, i)) }
     .toVector
 
-  private val extensions: Set[ExtensionRegistration[CaseClassExtension]] = c.extensions(CaseClassExtension.key)
+  private val extensions: Set[ExtensionRegistration[CaseClassExtension]] = c.extensions(CaseClassExtension)
 
   private class FieldContextImpl(val f: FieldImpl, val ext: ExtensionRegistration[CaseClassExtension])
   extends CaseClassContext {
     // TODO: Wrap 'nested' with added generation path
-    export c.{generationMode, freshName, symbolModifiers, loadPlugin, plugins, extensions, nested}
+    export c.{generationMode, symbolModifiers, loadPlugin, plugins, extensions, nested}
 
     val report: ErrorReporting = c.reportBuilder
       .usePlugin(ext.pluginClass)
@@ -238,6 +239,18 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
     r.result()
   }
 
+  private class NestedCode[N](f: FieldImpl => N) {
+    val code: Seq[N] = outer.fields.map(f)
+    val keys: Map[String, N] = outer.fields.zip(code).flatMap { case (f, c) => f.result.handledKeys.map(_ -> c) }.toMap
+    val dynamicKeys: Option[N] = outer.fields.zip(code).find(_._1.result.handlesDynamicKeys).map(_._2)
+
+    def key(s: String): N =
+      keys.getOrElse(s, throw new IllegalArgumentException(s"Key '$key' is not present in the object"))
+
+    def dynamicKey: N =
+      dynamicKeys.getOrElse(throw new IllegalArgumentException("Dynamic keys are not present in the object"))
+  }
+
   val result: ObjectModel[R] = {
     for (f <- fields) populateField(f)
     checkConsistency()
@@ -261,31 +274,18 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
 
       def generateDecoder(using Quotes, DecodingEnvironment): DecodingCode =
         new DecodingCode {
-          private val fieldCode: Seq[DecodingCode] = outer.fields.map(_.result.generateDecoder)
-          private val keyCode: Map[String, DecodingCode] =
-            outer.fields.zip(fieldCode)
-              .flatMap { case (f, c) => f.result.handledKeys.map(_ -> c) }
-              .toMap
+          private val c: NestedCode[DecodingCode] = new NestedCode(_.result.generateDecoder)
 
-          private val dynamicKeyCode: Option[DecodingCode] =
-            outer.fields.zip(fieldCode)
-              .find(_._1.result.handlesDynamicKeys)
-              .map(_._2)
-
-          def usedVariables: Seq[Variable[_]] = fieldCode.flatMap(_.usedVariables)
+          def usedVariables: Seq[Variable[_]] = c.code.flatMap(_.usedVariables)
 
           def decodeKey(key: String, reader: Expr[JsonReader])(using Quotes): Expr[Any] =
-            keyCode
-              .getOrElse(key, throw new IllegalArgumentException(s"Key '$key' is not present in the object"))
-              .decodeKey(key, reader)
+            c.key(key).decodeKey(key, reader)
 
           override def decodeDynamicKey(key: Expr[String], reader: Expr[JsonReader])(using Quotes): Expr[Any] =
-            dynamicKeyCode
-              .getOrElse(throw new IllegalArgumentException("Dynamic keys are not present in the object"))
-              .decodeDynamicKey(key, reader)
+            c.dynamicKey.decodeDynamicKey(key, reader)
 
           def decodeFinal()(using Quotes): Expr[Any] =
-            CodeUtils.joinBlocks(fieldCode.map(_.decodeFinal()))
+            CodeUtils.joinBlocks(c.code.map(_.decodeFinal()))
 
           def decodeResult()(using Quotes): Expr[Any] = {
             import quotes.reflect.*
@@ -300,10 +300,21 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
               result = TypeApply(result, typeArgs.map(t => Inferred(t.asInstanceOf[TypeRepr])))
             }
 
-            groupFields(outer.fields.zip(fieldCode))(_._1.listIndex, _._2.decodeResult())
+            groupFields(outer.fields.zip(c.code))(_._1.listIndex, _._2.decodeResult())
               .foldLeft(result)((t, args) => Apply(t, args.map(_.asTerm)))
               .asExpr
           }
+        }
+
+      /** @return Generated schemas for the field */
+      def generateSchema(using Quotes): SchemaCode =
+        new SchemaCode {
+          private val c: NestedCode[SchemaCode] = new NestedCode(_.result.generateSchema)
+          def key(key: String): SchemaExpr[?] = c.key(key).key(key)
+          def keyOrdering: Seq[String] = c.code.flatMap(_.keyOrdering)
+          def requiredKeys: Set[String] = c.code.flatMap(_.requiredKeys).toSet
+          def dynamicKey: Option[SchemaExpr[?]] = c.dynamicKey.dynamicKey
+          def dynamicKeyNames: Option[SchemaExpr[String]] = c.dynamicKey.dynamicKeyNames
         }
     }
   }

@@ -3,9 +3,10 @@ package s3j.core.casecls
 import s3j.core.casecls.CaseClassContext.{ObjectModel, ObjectModelBuilder}
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.GenerationContext
-import s3j.macros.codegen.{NameGenerator, Variable}
+import s3j.macros.codegen.Variable
 import s3j.macros.generic.GenerationConfidence
 import s3j.macros.modifiers.ModifierSet
+import s3j.macros.schema.SchemaExpr
 import s3j.macros.traits.{BasicPluginContext, NestedBuilder}
 import s3j.macros.utils.GenerationPath
 
@@ -38,8 +39,7 @@ object CaseClassContext {
   }
 
   /** Generic environment for code generation */
-  trait GenerationEnvironment extends NameGenerator {
-  }
+  trait GenerationEnvironment {}
 
   trait DecodingEnvironment extends GenerationEnvironment {
     /** @return Code which checks the presence of (statically known) key and throws if key is missing */
@@ -109,6 +109,26 @@ object CaseClassContext {
     def decodeResult()(using Quotes): Expr[Any]
   }
 
+  trait SchemaCode {
+    /** @return Key ordering */
+    def keyOrdering: Seq[String]
+    
+    /** @return Set of required keys */
+    def requiredKeys: Set[String]
+    
+    /** @return Schema for statically known key */
+    def key(key: String): SchemaExpr[?]
+
+    /**
+     * @return Schema for dynamic keys, or `None` if any values are acceptable.
+     *         Called only if [[ObjectField.handlesDynamicKeys]] is true, otherwise dynamic keys are forbidden.
+     */
+    def dynamicKey: Option[SchemaExpr[?]]
+
+    /** @return Optional schema for dynamic key names. Called only if [[ObjectField.handlesDynamicKeys]] is true */
+    def dynamicKeyNames: Option[SchemaExpr[String]]
+  }
+
   /** Model describing a serialization scheme for a single field */
   trait ObjectField[T] {
     /** Identity of this field group */
@@ -138,6 +158,9 @@ object CaseClassContext {
      * @return       Generated code to decode this field
      */
     def generateDecoder(using Quotes, DecodingEnvironment): DecodingCode
+
+    /** @return Generated schemas for the field */
+    def generateSchema(using Quotes): SchemaCode
   }
 
   /** Model describing a serialization scheme for an object. Acts as a big object field producing the whole object. */

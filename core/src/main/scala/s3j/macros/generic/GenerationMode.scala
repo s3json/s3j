@@ -2,6 +2,7 @@ package s3j.macros.generic
 
 import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat, StringyDecoder, StringyEncoder, StringyFormat}
 import s3j.macros.generic.GenerationMode
+import s3j.schema.JsonSchema
 
 import scala.compiletime.error
 import scala.quoted.*
@@ -28,6 +29,7 @@ object GenerationMode {
         else if (base =:= TypeRepr.of[StringyDecoder]) (StringDecoder, arg)
         else if (base =:= TypeRepr.of[StringyEncoder]) (StringEncoder, arg)
         else if (base =:= TypeRepr.of[StringyFormat]) (StringFormat, arg)
+        else if (base =:= TypeRepr.of[JsonSchema]) (Schema, arg)
         else throwError
 
       case _ => throwError
@@ -103,6 +105,18 @@ object GenerationMode {
       TypeRepr.of[StringyFormat].appliedTo(t)
     }
   }
+
+  /** Schema generation mode */
+  case object Schema extends GenerationMode {
+    def generateEncoders: Boolean = false
+    def generateDecoders: Boolean = false
+    def stringy: Boolean = false
+
+    def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr = {
+      import q.reflect.*
+      TypeRepr.of[JsonSchema].appliedTo(t)
+    }
+  }
 }
 
 sealed trait GenerationMode {
@@ -115,9 +129,12 @@ sealed trait GenerationMode {
   /** @return Whether this mode means stringy result */
   def stringy: Boolean
 
+  /** @return Whether this mode means generation of schema */
+  def schema: Boolean = this == GenerationMode.Schema
+
   /** @return Whether two modes are compatible in terms of decoding/encoding/formatting */
   def modeCompatible(other: GenerationMode): Boolean =
-    generateEncoders == other.generateEncoders && generateDecoders == other.generateDecoders
+    schema == other.schema && generateEncoders == other.generateEncoders && generateDecoders == other.generateDecoders
 
   /** @return Type class applied to given type (e.g. `JsonDecoder[X]` when decoding) */
   def appliedType(using q: Quotes)(t: q.reflect.TypeRepr): q.reflect.TypeRepr

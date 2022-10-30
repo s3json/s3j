@@ -1,13 +1,14 @@
 package s3j.macros.generic
 
 import s3j.format.{JsonDecoder, JsonEncoder}
-import s3j.format.util.Recursive
 import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, GenerationRejection}
 import s3j.macros.codegen.{AssistedImplicits, Position as XPosition}
-import s3j.macros.{GenerationContext, PluginContext, PluginCapability}
+import s3j.macros.{GenerationContext, PluginCapability, PluginContext}
 import s3j.macros.modifiers.{BuiltinModifiers, ModifierSet}
+import s3j.macros.schema.SchemaExpr
 import s3j.macros.traits.{ErrorReporting, NestedBuilder, NestedResult, ReportingBuilder}
 import s3j.macros.utils.{ForbiddenMacroUtils, GenerationPath, MacroUtils, ReportingUtils}
+import s3j.schema.JsonSchema
 
 import java.io.{PrintWriter, StringWriter}
 import scala.util.control.NonFatal
@@ -19,8 +20,6 @@ import scala.quoted.runtime.impl.QuotesImpl
 private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
   import q.reflect.*
   import q.{reflect => or}
-
-  private var _serializerIndex: Int = 0
 
   private case object ImplicitIdentity
   case class StackEntry(target: TypeRepr, modifiers: ModifierSet, path: Seq[GenerationPath], label: Option[String],
@@ -38,29 +37,6 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
 
     val basicKey: BasicCachingKey = BasicCachingKey(target, modifiers)
     val implicitKey: ImplicitCachingKey = ImplicitCachingKey(target)
-  }
-
-  private class NestedResultImpl[T](handle: SerializerHandle)(using Type[T]) extends NestedResult[T] {
-    def raw(using q: Quotes): Expr[Any] = {
-      import q.reflect.*
-      Ref(handle.variableSymbol.asInstanceOf[Symbol]).asExpr
-    }
-
-    def encoder(using Quotes): Expr[JsonEncoder[T]] = {
-      if (!generationMode.generateEncoders) {
-        throw new IllegalStateException("Encoders are not generated in mode " + generationMode)
-      }
-
-      raw.asExprOf[JsonEncoder[T]]
-    }
-
-    def decoder(using Quotes): Expr[JsonDecoder[T]] = {
-      if (!generationMode.generateDecoders) {
-        throw new IllegalStateException("Decoders are not generated in mode " + generationMode)
-      }
-
-      raw.asExprOf[JsonDecoder[T]]
-    }
   }
 
   private abstract class BasicContextImpl(val task: GenerationTask, val owner: PluginContainer)
@@ -110,19 +86,16 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
           this
         }
 
-        def build(): NestedResult[T] = {
-          val raw = outer.generate(task.copy(
+        def build(): NestedResult[T] =
+          outer.generate(task.copy(
             stack = StackEntry(
-              target = or.TypeRepr.of[T],
+              target = or.TypeRepr.of[T].dealias.simplified,
               modifiers = _modifiers,
               path = _genPath,
               label = None,
               mode = generationMode
             ) :: task.stack
-          ))
-
-          new NestedResultImpl[T](raw)
-        }
+          )).toNestedResult[T]
       }
     }
 
@@ -182,7 +155,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
         case _ => None
       }
 
-    export outer.{extensions, freshName, loadPlugin, plugins, symbolModifiers}
+    export outer.{extensions, loadPlugin, plugins, symbolModifiers}
 
     def identity: AnyRef =
       try candidate.get.identity
@@ -190,10 +163,10 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
         case NonFatal(e) => reportException("Plugin failed to provide a serializer identity", e)
       }
 
-    def doGeneration(quotes: Quotes): Term = {
+    def doGeneration[R](f: GenerationCandidate => R): R = {
       generating = true
 
-      try candidate.get.generate(using quotes)().asTerm
+      try f(candidate.get)
       catch {
         case e: StopMacroExpansion => throw e
         case NonFatal(e) => reportException("Plugin failed to generate serializer code", e)
@@ -202,39 +175,23 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
   }
 
   private def createHandle(task: GenerationTask, key: CachingKey, identity: AnyRef, simpleGen: Boolean,
-                           gen: Quotes => Term): SerializerHandle =
+                           generate: SerializerHandle => Unit): SerializerHandle =
   {
     val ret = new SerializerHandle
 
-    ret.variableName = freshName("s" + task.typeSymbol.name)
-    ret.recursiveWrapper = !simpleGen
-
-    ret.serializedType = task.target
-    ret.variableType =
-      if (!ret.recursiveWrapper) generationMode.appliedType(task.target)
-      else generationMode match {
-        case GenerationMode.Decoder => TypeRepr.of[Recursive.Decoder].appliedTo(task.target)
-        case GenerationMode.Encoder => TypeRepr.of[Recursive.Encoder].appliedTo(task.target)
-        case GenerationMode.Format => TypeRepr.of[Recursive.Format].appliedTo(task.target)
-      }
-
-    ret.variableSymbol = Symbol.newVal(Symbol.spliceOwner, ret.variableName, ret.variableType, Flags.EmptyFlags,
-      Symbol.noSymbol)
-
-    ret.variableRef = Ref(ret.variableSymbol)
+    ret.generationMode = task.mode
+    ret.variableName = task.typeSymbol.name + "_" + _serializerIdx
+    ret.targetType = task.target
     ret.identity = identity
 
     // Store cache _before_ generation, so recursive types won't be regenerated infinitely
+    _serializerIdx += 1
     _serializerSet.add(ret)
     _serializers.put(task.basicKey, ret)
     _serializers.put(key, ret)
 
     ForbiddenMacroUtils.clearQuotesCache()
-    ret.definition = gen((if (ret.recursiveWrapper) Symbol.spliceOwner else ret.variableSymbol).asQuotes)
-
-    // Store order _after_ generation, so nested types will get lower order
-    ret.order = _serializerIndex
-    _serializerIndex += 1
+    generate(ret)
 
     ret
   }
@@ -313,8 +270,14 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       return _serializers(key)
     }
 
-    createHandle(task, key, key.identity, simpleGen = context.candidate.exists(_.simpleGeneration),
-      q => context.doGeneration(q).asInstanceOf[Term])
+    createHandle(task, key, key.identity, simpleGen = context.candidate.exists(_.simpleGeneration), h => {
+      if (h.generationMode.schema) {
+        h.storeSchema(context.doGeneration(c => c.generateSchema()))
+      } else {
+        h.initializeDefault()
+        h.definition = context.doGeneration(c => c.generate(using h.variableSymbol.asQuotes)()).asTerm
+      }
+    })
   }
 
   private def searchImplicits(t: TypeRepr, behaviors: Set[ImplicitBehavior]): AssistedImplicits.SearchResult = {
@@ -327,6 +290,9 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
 
       case GenerationMode.Format | GenerationMode.StringFormat =>
         Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Format")
+
+      case GenerationMode.Schema =>
+        Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Schema")
     }
 
     AssistedImplicits.search(t, behaviors.flatMap(_.extraLocations), Some(assistedHelper))
@@ -351,7 +317,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
         ) :: task.stack
       )
 
-      generate(subTask).variableRef.asExpr
+      generate(subTask).reference.asExpr
     }
 
     r.expr(holes)
@@ -390,8 +356,20 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
 
     searchImplicits(generationMode.appliedType(task.target), implicitBehaviors.map(_._1)) match {
       case success: AssistedImplicits.SearchSuccess =>
-        createHandle(task, task.implicitKey, ImplicitIdentity, simpleGen = true,
-          q => generateImplicit(task, success)(using q).asTerm)
+        createHandle(task, task.implicitKey, ImplicitIdentity, simpleGen = true, h => {
+          if (h.generationMode.schema) {
+            val expr = generateImplicit(task, success)(using h.variableSymbol.asQuotes)
+            h.initialize(expr.asTerm.tpe)
+            h.definition = expr.asTerm
+
+            type T
+            given Type[T] = h.targetType.asType.asInstanceOf[Type[T]]
+            h.schemaDefinition = SchemaExpr.fromExpr[T](expr.asExprOf[JsonSchema[T]])
+          } else {
+            h.initializeDefault()
+            h.definition = generateImplicit(task, success)(using h.variableSymbol.asQuotes).asTerm
+          }
+        })
 
       case AssistedImplicits.SearchFailure(explanation) =>
         if (task.modifiers.contains(BuiltinModifiers.requireImplicit)) {

@@ -9,6 +9,7 @@ import s3j.format.util.ObjectFormatUtils.RestFieldsBuilder
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.codegen.Variable
 import s3j.macros.generic.GenerationConfidence
+import s3j.macros.schema.SchemaExpr
 
 import scala.quoted.{Expr, Quotes, Type, quotes}
 
@@ -38,6 +39,15 @@ class RestFieldsExtension extends CaseClassExtension {
 
         def decodeFinal()(using Quotes): Expr[Any] = '{}
         def decodeResult()(using Quotes): Expr[Any] = '{ $builder.result() }
+      }
+
+    def generateSchema(using Quotes): SchemaCode =
+      new SchemaCode {
+        def requiredKeys: Set[String] = Set()
+        def keyOrdering: Seq[String] = Nil
+        def key(key: String): SchemaExpr[Any] = throw new UnsupportedOperationException("RestField.schema.key")
+        def dynamicKey: Option[SchemaExpr[Any]] = None
+        def dynamicKeyNames: Option[SchemaExpr[String]] = None
       }
   }
 

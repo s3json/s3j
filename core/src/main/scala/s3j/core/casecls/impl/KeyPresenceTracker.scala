@@ -1,15 +1,15 @@
 package s3j.core.casecls.impl
 
-import s3j.macros.codegen.{NameGenerator, Variable}
+import s3j.macros.codegen.Variable
 
 import scala.quoted.{Quotes, Expr, quotes}
 
-class KeyPresenceTracker(keys: Set[String], nameGenerator: NameGenerator)(using Quotes) {
+class KeyPresenceTracker(keys: Set[String])(using Quotes) {
   private val keyIndices: Map[String, Int] = keys.toVector.sorted.zipWithIndex.toMap
   private val keysPerVariable: Int = 64
   private val keyVarCount: Int = (keyIndices.size + keysPerVariable - 1) / keysPerVariable
   private val keyVariables: IndexedSeq[Variable[Long]] = (0 until keyVarCount).
-    map(i => Variable.create("keyMask" + i)(Expr(0L))(using quotes, nameGenerator))
+    map(i => Variable.create("keyMask" + i)(Expr(0L)))
 
   def variables: Seq[Variable[_]] = keyVariables
 

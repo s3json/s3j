@@ -52,6 +52,8 @@ class OptionExtension extends CaseClassExtension {
 
         def decodeResult()(using Quotes): Expr[Any] = result.value
       }
+
+    def generateSchema(using Quotes): SchemaCode = ???
   }
 
   override def processField[T](using CaseClassContext)(field: FieldRequest[T])

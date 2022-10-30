@@ -268,6 +268,9 @@ object JsObject {
  * spurious exceptions).
  */
 final class JsObject(val items: Map[String, JsValue], val order: Seq[String] = Nil) extends JsValue {
+  // commented out for performance, uncomment to debug weird crashes:
+  // assert(order.isEmpty || order.toSet == items.keySet, "ordering array is malformed")
+
   def typeName: String = "object"
   
   /** Iterate contents of this object. Iteration respects key ordering */
@@ -282,20 +285,42 @@ final class JsObject(val items: Map[String, JsValue], val order: Seq[String] = N
   /** @return Iterator for this object. Iteration respects key ordering */
   def iterator: Iterator[(String, JsValue)] = new ObjectIterator(this)
 
+  /** @return Whether object has defined key ordering */
+  def hasOrdering: Boolean = items.isEmpty || order.nonEmpty
+
+  /** @return This object with ordered keys */
+  def ordered: JsObject = if (hasOrdering) this else sorted
+
+  /** @return This object with alphabetically sorted keys */
+  def sorted: JsObject = new JsObject(items, items.keysIterator.toVector.sorted)
+
   def has(key: String): Boolean = items.contains(key)
   def get(key: String): Option[JsValue] = items.get(key)
   def apply(key: String): JsValue = items(key)
 
-  /** Create subset of object with only specific keys preserved */
+  /** Create a subset of object with only specific keys preserved */
   def subObject(keys: Seq[String]): JsObject = {
     val keySet = keys.toSet
     new JsObject(items.filter(i => keySet(i._1)), keys)
   }
 
+  /** Create a subset of this object with key excluded */
+  def excludeKey(key: String): JsObject =
+    new JsObject(items - key, order.filterNot(_ == key))
+
+  /** Create a subset of this object with given keys excluded */
+  def excludeKeys(keys: Set[String]): JsObject =
+    new JsObject(items.filter(i => !keys(i._1)), order.filterNot(keys))
+  
+  /** Create new object where given key is replaced with a new value. Ordering is not changed. */
+  def replaceValue(key: String, value: JsValue): JsObject = 
+    if (items.contains(key)) new JsObject(items + (key -> value), order)
+    else this
+  
   /** Add new key-value pair to the end of this object */
   @targetName("add")
   def + (kv: (String, JsValue)): JsObject = {
-    if (items.nonEmpty && order.isEmpty) new JsObject(items + kv, Nil)
+    if (!hasOrdering) new JsObject(items + kv, Nil)
     else if (items.isEmpty) new JsObject(Map(kv), Vector(kv._1))
     else if (!items.contains(kv._1)) new JsObject(items + kv, order :+ kv._1)
     else new JsObject(items + kv, order.filterNot(_ == kv._1) :+ kv._1)
@@ -304,8 +329,25 @@ final class JsObject(val items: Map[String, JsValue], val order: Seq[String] = N
   /** Add all key-value pairs to the end of this object in specified order */
   @targetName("addAll")
   def ++ (kvs: (String, JsValue)*): JsObject = {
-    if (kvs.forall(kv => !items.contains(kv._1))) new JsObject(items ++ kvs, order ++ kvs.map(_._1))
-    else new JsObject(items ++ kvs, order.filterNot(kvs.map(_._1).toSet) ++ kvs.map(_._1))
+    if (kvs.forall(kv => !items.contains(kv._1))) {
+      val nextOrder = if (hasOrdering) order ++ kvs.map(_._1) else Nil
+      new JsObject(items ++ kvs, nextOrder)
+    } else {
+      val nextOrder = if (hasOrdering) order.filterNot(kvs.map(_._1).toSet) ++ kvs.map(_._1) else Nil
+      new JsObject(items ++ kvs, nextOrder)
+    }
+  }
+
+  /** Add all key-value pairs from given object to the end of this object */
+  @targetName("addAll")
+  def ++ (other: JsObject): JsObject = {
+    val keysIntersect = other.keysIterator.exists(items.contains)
+    val nextOrder =
+      if (!hasOrdering || !other.hasOrdering) Nil
+      else if (!keysIntersect) order ++ other.order
+      else order.filterNot(other.items.contains) ++ other.order
+
+    new JsObject(items ++ other.items, nextOrder)
   }
 
   // Field ordering is excluded from equality check, as it's for aesthetics only

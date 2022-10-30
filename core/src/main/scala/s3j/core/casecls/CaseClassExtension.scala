@@ -5,9 +5,7 @@ import s3j.macros.generic.Extensions
 
 import scala.quoted.{Quotes, Type}
 
-object CaseClassExtension {
-  val key: Extensions.Key[CaseClassExtension] = Extensions.key("caseClass")
-}
+case object CaseClassExtension extends Extensions.Key[CaseClassExtension]("caseClass")
 
 abstract class CaseClassExtension {
   def processField[T](using CaseClassContext)(field: FieldRequest[T])(using Quotes, Type[T]): GenerationOutcome[T] = 

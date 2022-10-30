@@ -1,6 +1,7 @@
 package s3j.format
 
-import s3j.io.JsonWriter
+import s3j.ast.JsValue
+import s3j.io.{JsonWriter, AstJsonWriter}
 
 object JsonEncoder {
   /**
@@ -15,6 +16,13 @@ object JsonEncoder {
 trait JsonEncoder[T] { outer =>
   /** Encode value into supplied JsonWriter */
   def encode(writer: JsonWriter, value: T): Unit
+
+  /** Encode value into JsValue */
+  def encodeValue(value: T): JsValue = {
+    val writer = new AstJsonWriter
+    encode(writer, value)
+    writer.result()
+  }
 
   /** @return [[JsonEncoder]] which applies a function to the encoded value */
   def mapEncoded[R](f: R => T): JsonEncoder[R] =
