@@ -4,33 +4,33 @@ import s3j.format.util.DecoderUtils
 import s3j.format.JsonFormat
 import s3j.io.{JsonReader, JsonToken, JsonWriter}
 
-object AdditionalProperties {
-  given schemaWrapper: Conversion[SchemaDocument, AdditionalProperties] = AdditionalProperties.Schema(_)
+object SchemaOrFalse {
+  given schemaWrapper: Conversion[SchemaDocument, SchemaOrFalse] = SchemaOrFalse.Schema(_)
   
-  given additionalPropsFormat: JsonFormat[AdditionalProperties] with {
+  given additionalPropsFormat: JsonFormat[SchemaOrFalse] with {
     private def document: JsonFormat[SchemaDocument] = implicitly
 
-    def encode(writer: JsonWriter, value: AdditionalProperties): Unit =
+    def encode(writer: JsonWriter, value: SchemaOrFalse): Unit =
       value match {
-        case AdditionalProperties.Forbidden => writer.boolValue(false)
-        case AdditionalProperties.Schema(schema) => document.encode(writer, schema)
+        case SchemaOrFalse.Forbidden => writer.boolValue(false)
+        case SchemaOrFalse.Schema(schema) => document.encode(writer, schema)
       }
 
-    def decode(reader: JsonReader): AdditionalProperties =
+    def decode(reader: JsonReader): SchemaOrFalse =
       reader.peekToken match {
         case JsonToken.TFalseValue =>
           reader.nextToken()
-          AdditionalProperties.Forbidden
+          SchemaOrFalse.Forbidden
 
         case JsonToken.TObjectStart =>
-          AdditionalProperties.Schema(document.decode(reader))
+          SchemaOrFalse.Schema(document.decode(reader))
 
         case other => DecoderUtils.throwUnexpected(reader, "false or object", other)
       }
   }
 }
 
-enum AdditionalProperties {
+enum SchemaOrFalse {
   /** Additional properties are forbidden (serialized as `false`) */
   case Forbidden
 

@@ -18,7 +18,7 @@ import scala.quoted.{Expr, Quotes, Type, quotes}
 private[casecls] class CaseClassCandidate[T](modifiers: ModifierSet)(using c: GenerationContext)(using Quotes, Type[T]) {
   import quotes.reflect.*
 
-  private val allowUnknownKeys = modifiers.get(UnknownKeysModifier.key).fold(false)(_.allow)
+  private val allowUnknownKeys = modifiers.get(UnknownKeysModifier).fold(false)(_.allow)
   private val obj = new CaseClassObjectBuilder[T](
     CaseClassObjectBuilder.StackEntry(
       t = Type.of[T],

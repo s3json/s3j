@@ -38,21 +38,24 @@ object InlineSchemaMacros {
     val deps: List[TypeRepr] =
       if (depType.isTupleN) depType.typeArgs
       else if (depType == TypeRepr.of[Unit]) Nil
-      else report.errorAndAbort("Failed to extract list of dependencies from " +
-        depType.show(using Printer.TypeReprStructure))
+      else depType match {
+        case t: ParamRef => t :: Nil
+        case _ => report.errorAndAbort("Failed to extract list of dependencies from " +
+          depType.show(using Printer.TypeReprStructure))
+      }
 
     val params: Map[String, Symbol] = method.paramSymss.flatten.filterNot(_.isType).map(s => s.name -> s).toMap
 
-    val depExprs: List[Expr[() => JsonSchema[?]]] = deps.map {
+    val depExprs: List[Expr[JsonSchema[?]]] = deps.map {
       case ParamRef(_, idx) =>
         val s = params(methodArgs(idx))
-        '{ () => ${ Ref(s).asExprOf[JsonSchema[?]] } }
+        Ref(s).asExprOf[JsonSchema[?]]
 
       case other => report.errorAndAbort("Failed to extract parameter from type " +
         other.show(using Printer.TypeReprStructure))
     }
 
-    '{ new JsonSchema[T](${ Expr(json) }, Vector(${ Expr.ofSeq(depExprs) }:_*), true) }
+    '{ new JsonSchema[T](${ Expr(json) }, () => Vector(${ Expr.ofSeq(depExprs) }:_*), true) }
   }
 
   private def generateSimple[T](using q: Quotes, tt: Type[T])(tpe: q.reflect.TypeRepr): Expr[JsonSchema[T]] = {

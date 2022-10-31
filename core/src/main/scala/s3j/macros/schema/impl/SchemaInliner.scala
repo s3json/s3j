@@ -4,35 +4,43 @@ import s3j.ast.{JsArray, JsObject, JsValue}
 import s3j.macros.schema.SchemaExpr
 import s3j.schema.impl.SchemaOps
 import s3j.{*, given}
-import s3j.schema.model.SchemaDocument
+import s3j.schema.model.{InternalReference, SchemaDocument}
 import s3j.schema.model.SchemaDocument.ReferenceKey
 
 private[schema] object SchemaInliner {
   private class InliningContext {
+    var defsCache: Map[SchemaExpr[?], Int] = Map.empty
     var defs: Vector[SchemaExpr[?]] = Vector.empty
 
     def addDefinition(sch: SchemaExpr[?]): Int = {
+      if (defsCache.contains(sch)) {
+        return defsCache(sch)
+      }
+
+      val idx = defs.size
       defs :+= sch
-      defs.size - 1
+      defsCache += sch -> idx
+      idx
     }
   }
 
   private def inlineInner[T](context: InliningContext, sch: SchemaExpr.Inlined[T]): JsObject = {
-    def processRef(idx: Int, v: JsObject): JsObject = {
+    def processRef(idx: Int, force: Boolean, v: JsObject): JsObject = {
       val defn = sch.definitions(idx)
 
-      if (!defn.canInline) {
+      if (!defn.canInline || !(defn.shouldInline || force)) {
         val newIdx = context.addDefinition(defn)
-        v.replaceValue(ReferenceKey, SchemaDocument.makeReference(newIdx))
+        v.replaceValue(ReferenceKey, InternalReference(newIdx).toString)
       } else inlineInner(context, defn.asInstanceOf[SchemaExpr.Inlined[?]]) ++ v.excludeKey(ReferenceKey)
     }
 
     def processJson(v: JsValue): JsValue = v match {
       case v: JsObject if v.has(ReferenceKey) =>
-        val ref = v(ReferenceKey).convertTo[String]
-        SchemaDocument.parseReference(ref) match {
-          case Some(refIdx) => processRef(refIdx, v)
-          case None => v
+        v(ReferenceKey).convertTo[String] match {
+          case InternalReference(idx, forceInline) =>
+            processRef(idx, forceInline, v)
+
+          case _ => v
         }
 
       case v: JsObject => new JsObject(v.items.map((k, v) => k -> processJson(v)), v.order)
@@ -50,7 +58,7 @@ private[schema] object SchemaInliner {
     sch.copy(
       document = doc,
       definitions = ctx.defs
-    )(using sch.valueType)
+    )
   }
 
   /**

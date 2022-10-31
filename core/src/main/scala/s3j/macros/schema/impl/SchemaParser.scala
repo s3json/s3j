@@ -14,7 +14,8 @@ private[schema] object SchemaParser {
 
     if (deps <:< TypeRepr.of[Unit]) Nil
     else if (deps <:< TypeRepr.of[JsonSchema[?]]) fromType(deps) :: Nil
-    else ???
+    else if (deps.isTupleN) deps.typeArgs.map(t => fromType(t))
+    else report.errorAndAbort("Failed to parse dependencies from: " + deps.show)
   }
 
   def fromType(using q: Quotes)(t: q.reflect.TypeRepr): SchemaExpr[?] = {
@@ -22,7 +23,7 @@ private[schema] object SchemaParser {
 
     t.widen match {
       case baseTpe @ AppliedType(TypeRef(_, "InlineSchema"), List(inner, json, deps)) =>
-        val jsonStr = json match {
+        val jsonStr = json.dealias match {
           case ConstantType(StringConstant(str)) => str
           case _ => report.errorAndAbort("Failed to extract JSON from InlineSchema type: not a string constant: " +
             json.show + " in type " + baseTpe.show)
@@ -42,7 +43,30 @@ private[schema] object SchemaParser {
           definitions = parseDeps(deps),
           shouldInline = true
         )
+
+      case _ => t match {
+        case t: TermRef => fromUntypedExpr(Ref.term(t).asExpr)
+        case _ => report.errorAndAbort("Failed to derive JSON schema expression from type: " + t.show)
+      }
     }
+  }
+
+  def fromUntypedExpr(expr: Expr[Any])(using q: Quotes): SchemaExpr[?] = {
+    import q.reflect.*
+
+    val schemaSym = Symbol.requiredClass("s3j.schema.JsonSchema")
+    val exprTpe = expr.asTerm.tpe
+    if (!exprTpe.derivesFrom(schemaSym)) {
+      report.errorAndAbort(s"Failed to parse schema from expression ${expr.show}: " +
+        "type is not derived from JsonSchema[?]: " + exprTpe.show)
+    }
+
+    val innerTpe = exprTpe.baseType(schemaSym).typeArgs.head
+
+    type T
+    given Type[T] = innerTpe.asType.asInstanceOf[Type[T]]
+
+    fromExpr[T](expr.asExprOf[JsonSchema[T]])
   }
 
   def fromExpr[T](expr: Expr[JsonSchema[T]])(using q: Quotes, tt: Type[T]): SchemaExpr[T] = {

@@ -43,7 +43,7 @@ private[casecls] class PlainFieldExtension extends CaseClassExtension {
       }
 
     /** @return Generated schemas for the field */
-    def generateSchema(using Quotes): SchemaCode =
+    def generateSchema(using Quotes): SchemaCode[T] =
       new SchemaCode {
         def requiredKeys: Set[String] = Set(field.key)
         def keyOrdering: Seq[String] = Seq(field.key)

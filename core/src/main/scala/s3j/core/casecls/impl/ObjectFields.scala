@@ -38,7 +38,7 @@ object ObjectFields {
       }
     }
 
-    def generateSchema(using Quotes): CaseClassContext.SchemaCode = {
+    def generateSchema(using Quotes): CaseClassContext.SchemaCode[T] = {
       val baseSchema = base.generateSchema
       new SchemaCode {
         def requiredKeys: Set[String] = baseSchema.requiredKeys

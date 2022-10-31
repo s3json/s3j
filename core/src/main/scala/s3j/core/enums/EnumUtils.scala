@@ -8,9 +8,9 @@ import scala.quoted.Quotes
 
 object EnumUtils {
   def discriminator(using q: Quotes)(sym: q.reflect.Symbol, modifiers: ModifierSet): String =
-    modifiers.get(DiscriminatorModifier.key).map(_.name).getOrElse {
+    modifiers.get(DiscriminatorModifier).map(_.name).getOrElse {
       modifiers
-        .get(EnumCaseModifier.key)
+        .get(EnumCaseModifier)
         .fold(CaseConvention.NoConvention)(_.value)
         .transform(sym.name)
     }

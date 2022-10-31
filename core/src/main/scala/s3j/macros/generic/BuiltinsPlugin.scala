@@ -1,11 +1,13 @@
 package s3j.macros.generic
 
 import s3j.annotations.naming.*
+import s3j.annotations.schema.*
 import s3j.annotations.requireImplicit
 import s3j.core.casecls.modifiers.FieldCaseModifier
 import s3j.core.enums.modifiers.EnumCaseModifier
 import s3j.macros.modifiers.ModifierParser.{AnnotationModifier, StoredModifier, TextModifier}
-import s3j.macros.modifiers.{BuiltinModifiers, Modifier, ModifierContext, ModifierParser, ModifierSet}
+import s3j.macros.modifiers.{BuiltinModifiers, Modifier, ModifierContext, ModifierParser, ModifierParsers, ModifierSet}
+import s3j.macros.schema.modifiers.{SchemaDeprecatedModifier, SchemaDescriptionModifier, SchemaHiddenModifier, SchemaTitleModifier}
 import s3j.macros.{Plugin, PluginContext}
 
 import scala.quoted.{Quotes, Type, quotes}
@@ -19,7 +21,8 @@ class BuiltinsPlugin extends Plugin {
     ImplicitBehavior.Extend(
       Symbol.requiredModule("s3j.format.BasicFormats"),
       Symbol.requiredModule("s3j.format.CollectionFormats"),
-      Symbol.requiredModule("s3j.schema.BasicSchemas")
+      Symbol.requiredModule("s3j.schema.BasicSchemas"),
+      Symbol.requiredModule("s3j.schema.CollectionSchemas")
     )
   }
 
@@ -72,5 +75,9 @@ class BuiltinsPlugin extends Plugin {
     .parseFn[snakeCase](parseCaseConvention(CaseConvention.SnakeCase))
     .parseFn[defaultFieldCase](parseAnyConvention(FieldCaseModifier(_)))
     .parseFn[defaultEnumCase](parseAnyConvention(EnumCaseModifier(_)))
+    .parse[schemaHidden](SchemaHiddenModifier)
+    .parse[schemaDeprecated](SchemaDeprecatedModifier)
+    .parseFn[schemaTitle](ModifierParsers.parseString(SchemaTitleModifier(_)))
+    .parseFn[schemaDescription](ModifierParsers.parseString(SchemaDescriptionModifier(_)))
     .build()
 }

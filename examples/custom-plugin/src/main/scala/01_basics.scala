@@ -52,6 +52,6 @@ class MeowingPlugin extends Plugin {
 @usePlugin[MeowingPlugin]
 class meowingString extends StaticAnnotation
 
-case object MeowingModifier extends Modifier {
-  val key: ModifierKey[_ <: MeowingModifier.this.type] = ModifierKey("meowingString")
+case object MeowingModifier extends ModifierKey[MeowingModifier.type]("meowingString") with Modifier {
+  val key: ModifierKey[MeowingModifier.type] = this
 }

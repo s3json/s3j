@@ -11,8 +11,10 @@ import s3j.macros.codegen.{CodeUtils, Variable, Position as XPosition}
 import s3j.macros.generic.CaseConvention
 import s3j.macros.modifiers.ModifierSet
 import s3j.macros.schema.SchemaExpr
+import s3j.macros.schema.modifiers.{SchemaDeprecatedModifier, SchemaDescriptionModifier, SchemaHiddenModifier, SchemaTitleModifier}
 import s3j.macros.traits.{ErrorReporting, ReportingBuilder}
 import s3j.macros.utils.{GenerationPath, ReportingUtils}
+import s3j.schema.model.{SchemaAnnotations, SchemaDocument}
 
 import scala.annotation.threadUnsafe
 import scala.collection.mutable
@@ -41,6 +43,8 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
   private val modifiers: ModifierSet = stack.head.modifiers
   private val reportingStackBase: Seq[ReportingBuilder.StackEntry] = outer.stack.map(_.toReporting).reverse.tail
 
+  given Type[R] = stack.head.t.asInstanceOf[Type[R]]
+
   if (typeArgs.size != typeParams.size) {
     throw new IllegalArgumentException("Type parameters and arguments list differ in length for: " +
       typeSymbol.fullName + " (" + generatedType.show + ")")
@@ -63,9 +67,9 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
      * Use [[result.handledKeys]] and [[result.handlesDynamicKeys]] to query actual keys for this field.
      */
     val baseKey: String =
-      ownModifiers.get(FieldKeyModifier.key).map(_.fieldKey).getOrElse {
+      ownModifiers.get(FieldKeyModifier).map(_.fieldKey).getOrElse {
         inheritedModifiers
-          .get(FieldCaseModifier.key)
+          .get(FieldCaseModifier)
           .fold(CaseConvention.NoConvention)(_.value)
           .transform(ctorField.name)
       }
@@ -208,7 +212,7 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
 
   private def computeIdentity(): ObjectIdentity =
     ObjectIdentity(
-      unknownKeys = stack.head.modifiers(UnknownKeysModifier.key).allow,
+      unknownKeys = stack.head.modifiers(UnknownKeysModifier).allow,
       fields = fields
         .map { f => FieldIdentity(f.result.handledKeys, f.result.handlesDynamicKeys, f.result.identity) }
         .toSet
@@ -239,10 +243,26 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
     r.result()
   }
 
-  private class NestedCode[N](f: FieldImpl => N) {
-    val code: Seq[N] = outer.fields.map(f)
-    val keys: Map[String, N] = outer.fields.zip(code).flatMap { case (f, c) => f.result.handledKeys.map(_ -> c) }.toMap
-    val dynamicKeys: Option[N] = outer.fields.zip(code).find(_._1.result.handlesDynamicKeys).map(_._2)
+  private def augmentSchema[T](f: FieldImpl, s: SchemaExpr[T]): SchemaExpr[T] =
+    SchemaExpr.augmentModifiers(s, f.inheritedModifiers)
+
+  private def ownRootSchema: SchemaExpr.Inlined[R] =
+    SchemaExpr.augmentModifiers(SchemaExpr.Inlined(
+      document = SchemaDocument(
+        annotations = SchemaAnnotations(
+          title = Some(typeSymbol.name)
+        )
+      ),
+      shouldInline = true
+    ), modifiers).asInlined
+
+  private class NestedCode[N](f: FieldImpl => N, fieldFilter: FieldImpl => Boolean = _ => true) {
+    val fields: Seq[FieldImpl] = outer.fields.filter(fieldFilter)
+    val code: Seq[N] = fields.map(f)
+    val keyFields: Map[String, FieldImpl] = fields.flatMap(f => f.result.handledKeys.map(_ -> f)).toMap
+    val keys: Map[String, N] = fields.zip(code).flatMap { case (f, c) => f.result.handledKeys.map(_ -> c) }.toMap
+    val dynamicKeyField: Option[FieldImpl] = fields.find(_.result.handlesDynamicKeys)
+    val dynamicKeys: Option[N] = fields.zip(code).find(_._1.result.handlesDynamicKeys).map(_._2)
 
     def key(s: String): N =
       keys.getOrElse(s, throw new IllegalArgumentException(s"Key '$key' is not present in the object"))
@@ -307,14 +327,27 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
         }
 
       /** @return Generated schemas for the field */
-      def generateSchema(using Quotes): SchemaCode =
+      def generateSchema(using Quotes): SchemaCode[R] =
         new SchemaCode {
-          private val c: NestedCode[SchemaCode] = new NestedCode(_.result.generateSchema)
-          def key(key: String): SchemaExpr[?] = c.key(key).key(key)
+          private val c: NestedCode[SchemaCode[?]] = new NestedCode(_.result.generateSchema,
+            f => !f.inheritedModifiers.contains(SchemaHiddenModifier))
+
+          def key(key: String): SchemaExpr[?] = {
+            val code = c.key(key)
+            if (code.suppressAugmentation) code.key(key)
+            else augmentSchema(c.keyFields(key), code.key(key))
+          }
+
+          def dynamicKey: Option[SchemaExpr[?]] = {
+            val code = c.dynamicKey
+            if (code.suppressAugmentation) code.dynamicKey
+            else code.dynamicKey.map(augmentSchema(c.dynamicKeyField.get, _))
+          }
+
           def keyOrdering: Seq[String] = c.code.flatMap(_.keyOrdering)
           def requiredKeys: Set[String] = c.code.flatMap(_.requiredKeys).toSet
-          def dynamicKey: Option[SchemaExpr[?]] = c.dynamicKey.dynamicKey
           def dynamicKeyNames: Option[SchemaExpr[String]] = c.dynamicKey.dynamicKeyNames
+          override def rootSchema: Option[SchemaExpr.Inlined[R]] = Some(ownRootSchema)
         }
     }
   }

@@ -1,18 +1,18 @@
 package s3j.macros.schema
 
-import s3j.schema.model.SchemaDocument
+import s3j.schema.model.{InternalReference, SchemaDocument}
 
 import scala.quoted.{Expr, Type}
 
 private[schema] object SchemaExprBuilder {
-  def build[T](shouldInline: Boolean, defaultValue: Option[Expr[T]], exampleValues: Option[Seq[Expr[T]]])
-              (f: SchemaExprBuilder => SchemaDocument)(using Type[T]): SchemaExpr.Inlined[T] =
+  def build[T](shouldInline: Boolean, defaultValue: Option[UntypedExpr], exampleValues: Option[Seq[UntypedExpr]])
+              (f: SchemaExprBuilder => SchemaDocument): SchemaExpr.Inlined[T] =
   {
     var defs = Vector.empty[SchemaExpr[?]]
     val doc = f(new SchemaExprBuilder {
       def reference(schema: SchemaExpr[_]): SchemaDocument = {
         defs :+= schema
-        SchemaDocument.referenceSchema(defs.size - 1)
+        InternalReference(defs.size - 1)
       }
     })
 

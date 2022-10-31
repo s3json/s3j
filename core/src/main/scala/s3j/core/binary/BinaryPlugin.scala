@@ -30,21 +30,21 @@ class BinaryPlugin extends Plugin {
   }
 
   override def implicitBehavior[T](modifiers: ModifierSet)(using Quotes, PluginContext, Type[T]): ImplicitBehavior =
-    if (modifiers.contains(BinaryFormatModifier.key) && generateBinary[T].isDefined) ImplicitBehavior.Suppress
+    if (modifiers.contains(BinaryFormatModifier) && generateBinary[T].isDefined) ImplicitBehavior.Suppress
     else ImplicitBehavior.Neutral
 
   override def generate[T](modifiers: ModifierSet)(using Quotes, GenerationContext, Type[T]): GenerationOutcome =
     generateBinary[T] match {
       case Some(fn) =>
-        if (!modifiers.contains(BinaryFormatModifier.key))
+        if (!modifiers.contains(BinaryFormatModifier))
           GenerationRejection("No binary encoding format is set. Use annotations like @base64 to select one.")
         else new GenerationCandidate {
           def confidence: GenerationConfidence = 1000
-          def identity: AnyRef = modifiers(BinaryFormatModifier.key)
+          def identity: AnyRef = modifiers(BinaryFormatModifier)
           override def simpleGeneration: Boolean = true
 
           def generate(using Quotes)(): Expr[Any] = {
-            val fmt = modifiers(BinaryFormatModifier.key).format
+            val fmt = modifiers(BinaryFormatModifier).format
             fn(fmt.fn)
           }
 

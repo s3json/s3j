@@ -3,6 +3,7 @@ package s3j.core.casecls
 import s3j.core.casecls.CaseClassContext.ObjectField
 import s3j.core.casecls.impl.{CaseClassCodeGenerator, CaseClassSchemaGenerator, ObjectFields}
 import s3j.macros.generic.{Extensions, GenerationMode}
+import s3j.macros.modifiers.ModifierSet
 import s3j.macros.schema.SchemaExpr
 
 import scala.quoted.{Expr, Quotes, Type}

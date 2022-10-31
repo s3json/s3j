@@ -372,7 +372,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
         })
 
       case AssistedImplicits.SearchFailure(explanation) =>
-        if (task.modifiers.contains(BuiltinModifiers.requireImplicit)) {
+        if (task.modifiers.contains(BuiltinModifiers.RequireImplicit)) {
           report.errorAndAbort(formatMessage("@requireImplicit is present and no implicit candidate was found:\n\n" +
             explanation, task, plugin = None))
         }

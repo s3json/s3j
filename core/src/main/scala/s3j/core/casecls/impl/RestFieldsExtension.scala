@@ -41,7 +41,7 @@ class RestFieldsExtension extends CaseClassExtension {
         def decodeResult()(using Quotes): Expr[Any] = '{ $builder.result() }
       }
 
-    def generateSchema(using Quotes): SchemaCode =
+    def generateSchema(using Quotes): SchemaCode[T] =
       new SchemaCode {
         def requiredKeys: Set[String] = Set()
         def keyOrdering: Seq[String] = Nil

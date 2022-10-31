@@ -109,7 +109,7 @@ object CaseClassContext {
     def decodeResult()(using Quotes): Expr[Any]
   }
 
-  trait SchemaCode {
+  trait SchemaCode[T] {
     /** @return Key ordering */
     def keyOrdering: Seq[String]
     
@@ -127,6 +127,12 @@ object CaseClassContext {
 
     /** @return Optional schema for dynamic key names. Called only if [[ObjectField.handlesDynamicKeys]] is true */
     def dynamicKeyNames: Option[SchemaExpr[String]]
+
+    /** @return Schemas to be merged with root object schema */
+    def rootSchema: Option[SchemaExpr.Inlined[T]] = None
+
+    /** @return Whether default augmentation with annotations should be suppressed */
+    def suppressAugmentation: Boolean = false
   }
 
   /** Model describing a serialization scheme for a single field */
@@ -160,7 +166,7 @@ object CaseClassContext {
     def generateDecoder(using Quotes, DecodingEnvironment): DecodingCode
 
     /** @return Generated schemas for the field */
-    def generateSchema(using Quotes): SchemaCode
+    def generateSchema(using Quotes): SchemaCode[T]
   }
 
   /** Model describing a serialization scheme for an object. Acts as a big object field producing the whole object. */

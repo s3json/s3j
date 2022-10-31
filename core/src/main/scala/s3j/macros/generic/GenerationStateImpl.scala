@@ -1,6 +1,6 @@
 package s3j.macros.generic
 
-import s3j.format.{JsonEncoder, JsonDecoder}
+import s3j.format.{JsonDecoder, JsonEncoder}
 import s3j.macros.GenerationContext
 import s3j.macros.modifiers.ModifierSet
 import s3j.macros.schema.SchemaExpr
@@ -10,11 +10,11 @@ import java.lang.reflect.InvocationTargetException
 import scala.annotation.threadUnsafe
 import scala.collection.mutable
 import scala.quoted.{Expr, Quotes, Type}
-
 import dotty.tools.dotc.ast.{Trees, tpd, untpd}
-import dotty.tools.dotc.core.{Flags as DFlags, Symbols, Types}
+import dotty.tools.dotc.core.{Symbols, Types, Flags as DFlags}
 import dotty.tools.dotc.core.StdNames.nme
-import dotty.tools.dotc.core.Decorators._
+import dotty.tools.dotc.core.Decorators.*
+import s3j.schema.JsonSchema
 
 private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
   import q.reflect.*
@@ -46,7 +46,11 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
         throw new IllegalStateException("Schema is not generated in mode " + generationMode)
       }
 
-      handle.schemaDefinition.asInstanceOf[SchemaExpr[T]]
+      if (handle.schemaDefinition != null) {
+        handle.schemaDefinition.asInstanceOf[SchemaExpr[T]]
+      } else {
+        SchemaExpr.fromExpr(handle.reference.asExprOf[JsonSchema[T]])
+      }
     }
   }
 
@@ -82,7 +86,9 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
       initialize(generationMode.appliedType(targetType))
     }
 
-    def storeSchema(sch: SchemaExpr[?]): Unit = {
+    def storeSchema[X](sch: SchemaExpr[X]): Unit = {
+      given Type[X] = targetType.asType.asInstanceOf[Type[X]]
+
       if (!initialized) {
         initialize(TypeRepr.of(using SchemaExpr.toType(sch)))
       }
@@ -134,6 +140,7 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
   private class RefAnalysisState {
     var eagerDeps: Set[Symbol] = Set.empty
     var lateDeps: Set[Symbol] = Set.empty
+    var incomingDeps: Set[Symbol] = Set.empty
     var reachable: Boolean = false
     var eagerComplete: Boolean = false
     var order: Int = 0
@@ -143,6 +150,7 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
       sb ++= "{\n"
       sb ++= "  eagerDeps=[" ++= eagerDeps.map(_.name).mkString(", ") ++= "],\n"
       sb ++= "  lateDeps=[" ++= lateDeps.map(_.name).mkString(", ") ++= "],\n"
+      sb ++= "  incomingDeps=[" ++= incomingDeps.map(_.name).mkString(", ") ++= "],\n"
       sb ++= "  reachable=" ++= reachable.toString ++= ",\n"
       sb ++= "  eagerComplete=" ++= eagerComplete.toString ++= ",\n"
       sb ++= "  order=" ++= order.toString ++= "\n"
@@ -167,6 +175,7 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
                   if (ret.contains(sym)) {
                     if (eager) cst.eagerDeps += sym
                     else cst.lateDeps += sym
+                    ret(sym).incomingDeps += caller
                   }
               }
 
@@ -225,7 +234,7 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
     // Check for cycles:
     if (!ret.forall(_._2.eagerComplete)) {
       val sb = new mutable.StringBuilder
-      sb ++= "Generated serializer set has circular dependencies that prevented it from instantiation:\n"
+      sb ++= "Generated serializer stack has circular dependencies that prevented it from instantiation:\n"
 
       val symHandles = _serializerSet.map(h => h.variableSymbol -> h).toMap
       for (h <- _serializerSet; st = ret(h.variableSymbol) if st.reachable && !st.eagerComplete) {
@@ -242,7 +251,9 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl[_] =>
   def buildResult(root: Symbol): Term = {
     import qi.ctx
     val refs = analyzeReferences(root)
-    if (refs.count(_._2.reachable) == 1) {
+
+    // if the only reachable entry is root and it does not have any self-references - we can omit the class entirely
+    if (refs.count(_._2.reachable) == 1 && refs(root).incomingDeps.isEmpty) {
       return _serializerSet.find(_.variableSymbol == root).get.definition
     }
 

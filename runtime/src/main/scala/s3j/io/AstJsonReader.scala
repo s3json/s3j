@@ -163,9 +163,15 @@ extends JsonReader with JsonReader.Buffered {
   }
 
   def location: JsonLocation = {
-    val path = (state :: states).reverse.foldLeft(locationPrefix) {
-      case (p, e) if e.nodeType == NObject => JsPath.Object(p, e.currentKey)
-      case (p, e) if e.nodeType == NArray => JsPath.Array(p, e.currentIndex)
+    val path = (state :: states).reverseIterator.foldLeft(locationPrefix) {
+      case (p, e) if e.nodeType == NObject =>
+        if (e.currentKey != null) JsPath.Object(p, e.currentKey)
+        else p
+
+      case (p, e) if e.nodeType == NArray =>
+        if (e.currentIndex >= 0) JsPath.Array(p, e.currentIndex)
+        else p
+
       case (p, _) => p
     }
 

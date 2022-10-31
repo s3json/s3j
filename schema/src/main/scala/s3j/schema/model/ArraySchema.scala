@@ -6,8 +6,8 @@ object ArraySchema {
 
 case class ArraySchema(
   prefixItems:      Option[Seq[SchemaDocument]] = None,
-  items:            Option[AdditionalProperties] = None,
-  unevaluatedItems: Option[AdditionalProperties] = None,
+  items:            Option[SchemaOrFalse] = None,
+  unevaluatedItems: Option[SchemaOrFalse] = None,
   contains:         Option[SchemaDocument] = None,
   minContains:      Option[Int] = None,
   maxContains:      Option[Int] = None,

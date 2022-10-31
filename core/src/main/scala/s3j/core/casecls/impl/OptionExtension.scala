@@ -7,6 +7,7 @@ import s3j.format.util.DecoderUtils
 import s3j.io.{JsonReader, JsonToken, JsonWriter}
 import s3j.macros.codegen.Variable
 import s3j.macros.generic.GenerationConfidence
+import s3j.macros.schema.SchemaExpr
 import s3j.macros.traits.NestedResult
 
 import scala.quoted.*
@@ -53,7 +54,17 @@ class OptionExtension extends CaseClassExtension {
         def decodeResult()(using Quotes): Expr[Any] = result.value
       }
 
-    def generateSchema(using Quotes): SchemaCode = ???
+    def generateSchema(using Quotes): SchemaCode[Option[T]] =
+      new SchemaCode[Option[T]] {
+        def keyOrdering: Seq[String] = Seq(field.key)
+        def requiredKeys: Set[String] = Set.empty
+
+        def key(key: String): SchemaExpr[_] =
+          SchemaExpr.makeOptional(nested.schema)
+
+        def dynamicKey: Option[SchemaExpr[_]] = None
+        def dynamicKeyNames: Option[SchemaExpr[String]] = None
+      }
   }
 
   override def processField[T](using CaseClassContext)(field: FieldRequest[T])

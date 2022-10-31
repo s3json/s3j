@@ -10,27 +10,11 @@ import scala.collection.Factory
 private[format] class IterableFormat[T, C <: Iterable[T]](enc: JsonEncoder[T], dec: JsonDecoder[T],
                                                           factory: Factory[T, C])
 extends JsonFormat[C] {
-  def encode(writer: JsonWriter, value: C): Unit = {
-    val inner = ArrayFormatUtils.writeBeginArray(writer)
+  def encode(writer: JsonWriter, value: C): Unit =
+    ArrayFormatUtils.writeArray(writer, value)(using enc)
 
-    for (v <- value) {
-      enc.encode(inner, v)
-    }
-
-    ArrayFormatUtils.writeEndArray(writer)
-  }
-
-  def decode(reader: JsonReader): C = {
-    val bld = factory.newBuilder
-    val inner = ArrayFormatUtils.expectBeginArray(reader)
-
-    while (inner.peekToken != JsonToken.TStructureEnd) {
-      bld += dec.decode(inner)
-    }
-
-    ArrayFormatUtils.expectEndArray(reader)
-    bld.result()
-  }
+  def decode(reader: JsonReader): C =
+    ArrayFormatUtils.readArray[T, C](reader)(using dec, factory)
 
   override def toString: String = {
     if (enc == dec) s"IterableFormat($enc)"

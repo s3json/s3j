@@ -4,14 +4,18 @@ import s3j.schema.model.SchemaDocument
 import s3j.*
 import s3j.ast.JsValue
 
-object JsonSchema
+object JsonSchema {
+  type DefinitionsFn = () => Seq[JsonSchema[?]]
+  val noDefinitions: DefinitionsFn = () => Nil
+  def definitions(xs: JsonSchema[?]*): Seq[JsonSchema[?]] = xs
+}
 
 /**
  * Raw JSON schema definition for type `T`.
  *
  * @param schemaJson    Raw JSON schema string. References are specified as `"$ref": "~NNN"`, where `NNN` is an index
  *                      in [[definitions]] array.
- * @param definitions   Definitions for references used in [[schemaJson]], each index in reference prefixed with `~`.
+ * @param definitionsFn Definitions for references used in [[schemaJson]], each index in reference prefixed with `~`.
  * @param shouldInline  Whether this schema should be inlined when bundling, rather than referenced.
  * @param defaultFn     Getter for the default value, when its serialized version cannot be computed statically.
  * @param examplesFn    Getter for the example values, when their serialized versions cannot be computed statically.
@@ -19,7 +23,7 @@ object JsonSchema
  */
 class JsonSchema[T](
   schemaJson:     String,
-  definitions:    Seq[() => JsonSchema[_]] = Nil,
+  definitionsFn:  JsonSchema.DefinitionsFn = JsonSchema.noDefinitions,
   shouldInline:   Boolean = false,
   defaultFn:      Option[() => JsValue] = None,
   examplesFn:     Option[() => Seq[JsValue]] = None
@@ -45,6 +49,9 @@ class JsonSchema[T](
   
   /** Schema document as JSON pretty-printed string */
   def jsonPretty: String = document.toJsonString(2)
+  
+  /** Definitions for referenced schemas */
+  lazy val definitions: Seq[JsonSchema[?]] = definitionsFn()
 
   override def toString: String = s"JsonSchema($json, nDefs=${definitions.size})"
 }

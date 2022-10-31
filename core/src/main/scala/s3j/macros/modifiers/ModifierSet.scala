@@ -24,8 +24,11 @@ object ModifierSet {
 /** Parsed modifier set */
 final class ModifierSet private(private val items: Map[ModifierKey[_], Modifier]) {
   /** @return true when this set contains a modifier with given key */
-  def contains(key: ModifierKey[_]): Boolean = items.contains(key)
+  def contains(key: ModifierKey[?]): Boolean = items.contains(key)
 
+  /** @return true when this set contains any of the keys */
+  def containsAny(keys: ModifierKey[?]*): Boolean = keys.exists(contains)
+  
   /** @return Option with associated modifier, or key's default value */
   def get[T <: Modifier](key: ModifierKey[T]): Option[T] = items.get(key).orElse(key.default).asInstanceOf[Option[T]]
 

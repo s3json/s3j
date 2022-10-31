@@ -11,8 +11,8 @@ object ObjectSchema {
 case class ObjectSchema(
   properties:             Option[OrderedMap[String, SchemaDocument]] = None,
   patternProperties:      Option[OrderedMap[String, SchemaDocument]] = None,
-  additionalProperties:   Option[AdditionalProperties] = None,
-  unevaluatedProperties:  Option[AdditionalProperties] = None,
+  additionalProperties:   Option[SchemaOrFalse] = None,
+  unevaluatedProperties:  Option[SchemaOrFalse] = None,
   required:               Option[Set[String]] = None,
   propertyNames:          Option[SchemaDocument] = None,
   minProperties:          Option[Int] = None,

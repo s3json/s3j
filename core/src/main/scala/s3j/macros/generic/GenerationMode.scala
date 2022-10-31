@@ -23,14 +23,18 @@ object GenerationMode {
 
     t match {
       case AppliedType(base, List(arg)) =>
-        if (base =:= TypeRepr.of[JsonDecoder]) (Decoder, arg)
-        else if (base =:= TypeRepr.of[JsonEncoder]) (Encoder, arg)
-        else if (base =:= TypeRepr.of[JsonFormat]) (Format, arg)
-        else if (base =:= TypeRepr.of[StringyDecoder]) (StringDecoder, arg)
-        else if (base =:= TypeRepr.of[StringyEncoder]) (StringEncoder, arg)
-        else if (base =:= TypeRepr.of[StringyFormat]) (StringFormat, arg)
-        else if (base =:= TypeRepr.of[JsonSchema]) (Schema, arg)
-        else throwError
+        val mode = base.typeSymbol.fullName match {
+          case "s3j.format.JsonDecoder"     => GenerationMode.Decoder
+          case "s3j.format.JsonEncoder"     => GenerationMode.Encoder
+          case "s3j.format.JsonFormat"      => GenerationMode.Format
+          case "s3j.format.StringyDecoder"  => GenerationMode.StringDecoder
+          case "s3j.format.StringyEncoder"  => GenerationMode.StringEncoder
+          case "s3j.format.StringyFormat"   => GenerationMode.StringFormat
+          case "s3j.schema.JsonSchema"      => GenerationMode.Schema
+          case _ => throwError
+        }
+
+        mode -> arg
 
       case _ => throwError
     }

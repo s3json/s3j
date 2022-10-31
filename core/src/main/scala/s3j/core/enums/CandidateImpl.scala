@@ -52,9 +52,9 @@ extends GenerationCandidate {
   private case class EnumIdentity(behavior: Behavior, cases: Set[EnumCaseIdentity])
 
   private val typeSymbol: Symbol = TypeRepr.of[T].typeSymbol
-  private val behavior: Behavior = modifiers.get(EnumObjectModifier.key).fold(Behavior.Default)(_.behavior)
-  private val allowUnknownKeys: Boolean = modifiers.get(UnknownKeysModifier.key).exists(_.allow)
-  private val discriminatorField: String = modifiers.get(DiscriminatorFieldModifier.key).fold("type")(_.name)
+  private val behavior: Behavior = modifiers.get(EnumObjectModifier).fold(Behavior.Default)(_.behavior)
+  private val allowUnknownKeys: Boolean = modifiers.get(UnknownKeysModifier).exists(_.allow)
+  private val discriminatorField: String = modifiers.get(DiscriminatorFieldModifier).fold("type")(_.name)
 
   private val cases: Seq[EnumCase] = typeSymbol.children
     .zipWithIndex

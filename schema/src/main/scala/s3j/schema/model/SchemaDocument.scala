@@ -11,18 +11,6 @@ object SchemaDocument {
 
   /** JSON key with references */
   val ReferenceKey: String = "$ref"
-
-  /** @return Index if internal reference could be parsed, or `None` if reference is not internal one */
-  def parseReference(ref: String): Option[Int] =
-    if (ref.startsWith("~")) Some(ref.tail.toInt)
-    else None
-
-  /** @return Reference string for given index */
-  def makeReference(index: Int): String =
-    "~" + index
-
-  /** @return Schema document representing an internal reference */
-  def referenceSchema(index: Int): SchemaDocument = SchemaDocument(`$ref` = Some(makeReference(index)))
 }
 
 /**
@@ -33,6 +21,7 @@ object SchemaDocument {
  * @param `$defs`     Sub-schema definitions
  * @param `$ref`      Reference to schema definition
  * @param annotations Annotations for the type (i.e. human-readable description)
+ * @param s3j         s3j-specific annotations, describing more precise details of object
  * @param `type`      Basic type of the schema
  * @param format      Additional format information. JSON Schema specifies this field as a string-only, but de-facto it
  *                    is used for number too to specify precision.
@@ -50,13 +39,15 @@ case class SchemaDocument(
 
   @inlineObject annotations:  SchemaAnnotations = SchemaAnnotations.empty,
 
-  `type`:       Option[SchemaType] = None,
+  `type`:       Option[Seq[SchemaType]] = None,
   format:       Option[SchemaFormat] = None,
+  s3j:          Option[S3jAnnotations] = None,
 
   @inlineObject string:       StringSchema = StringSchema.empty,
   @inlineObject number:       NumberSchema = NumberSchema.empty,
   @inlineObject `object`:     ObjectSchema = ObjectSchema.empty,
   @inlineObject array:        ArraySchema = ArraySchema.empty,
+  @inlineObject composition:  CompositionSchema = CompositionSchema.empty,
 
   restFields:   JsObject = JsObject()
 ) derives JsonFormat {
