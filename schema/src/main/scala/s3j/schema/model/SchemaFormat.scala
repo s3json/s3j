@@ -62,7 +62,7 @@ enum SchemaFormat derives JsonFormat {
   /** Regular expression format */
   case Regex
 
-  // Number formats (non-standard, but de-facto used e.g. in Docker api specifications):
+  // Number formats (defined in OpenAPI specification)
 
   /** Unsigned 8-bit integer */
   case Uint8
@@ -87,6 +87,12 @@ enum SchemaFormat derives JsonFormat {
 
   /** Signed 64-bit integer */
   case Int64
+
+  /** Single-precision format */
+  case Float
+
+  /** Double-precision float */
+  case Double
 
   /** Custom value not modelled by this enumeration */
   case Custom(value: String)

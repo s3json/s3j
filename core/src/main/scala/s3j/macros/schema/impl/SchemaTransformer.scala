@@ -49,23 +49,7 @@ private[schema] object SchemaTransformer {
   }
 
   def makeOptional[T](root: SchemaExpr[T]): SchemaExpr[Option[T]] =
-    root match {
-      case root: SchemaExpr.Inlined[T] if root.document.`type`.isDefined =>
-        // just append "null" to "type" and it's done
-        root.copy(
-          document = root.document.copy(`type` = Some(root.document.`type`.get :+ SchemaType.Null))
-        )
-
-      // Fallback to anyOf mechanics:
-      case _ => SchemaExpr.build(shouldInline = true) { b =>
-        SchemaDocument(
-          composition = CompositionSchema(
-            anyOf = Some(Seq(
-              SchemaDocument(`type` = Some(SchemaType.Null)),
-              b.reference(root)
-            ))
-          )
-        )
-      }
+    SchemaExpr.build(shouldInline = true) { b =>
+      b.reference(root).copy(nullable = Some(true))
     }
 }

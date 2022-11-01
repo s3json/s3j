@@ -39,8 +39,9 @@ case class SchemaDocument(
 
   @inlineObject annotations:  SchemaAnnotations = SchemaAnnotations.empty,
 
-  `type`:       Option[Seq[SchemaType]] = None,
+  `type`:       Option[SchemaType] = None,
   format:       Option[SchemaFormat] = None,
+  nullable:     Option[Boolean] = None,
   s3j:          Option[S3jAnnotations] = None,
 
   @inlineObject string:       StringSchema = StringSchema.empty,

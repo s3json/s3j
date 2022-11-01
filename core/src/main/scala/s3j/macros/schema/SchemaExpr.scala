@@ -49,6 +49,10 @@ object SchemaExpr {
   def fromExpr[T](expr: Expr[JsonSchema[T]])(using Quotes, Type[T]): SchemaExpr[T] =
     SchemaParser.fromExpr(expr)
 
+  /** @return Parsed schema for untyped expression */
+  def fromUntypedExpr(expr: Expr[JsonSchema[?]])(using Quotes): SchemaExpr[?] =
+    SchemaParser.fromUntypedExpr(expr)
+
   /** @return Schema serialized as a runtime expression */
   def toExpr[T](schema: SchemaExpr[T], inlineTypes: Boolean = true)(using Quotes, Type[T]): Expr[JsonSchema[T]] =
     SchemaSerializer.toExpr(schema, !inlineTypes)
