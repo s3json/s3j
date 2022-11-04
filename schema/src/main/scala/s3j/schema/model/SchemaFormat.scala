@@ -62,7 +62,10 @@ enum SchemaFormat derives JsonFormat {
   /** Regular expression format */
   case Regex
 
-  // Number formats (defined in OpenAPI specification)
+  // OpenAPI specification formats
+
+  /** Password field, a hint to UIs to mask the input */
+  case Password
 
   /** Unsigned 8-bit integer */
   case Uint8
