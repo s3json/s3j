@@ -17,7 +17,7 @@ object FreshPluginContext {
      * @param value Definition for this entry
      * @tparam U    Actual type of definition, which could be more specific than overall type bound of this entry.
      */
-    def setDefinition(value: Quotes ?=> Expr[T]): Unit
+    def setDefinition(value: Expr[T]): Unit
     
     /** @return Quotes instance for generation of definition */
     def nestedQuotes: Quotes

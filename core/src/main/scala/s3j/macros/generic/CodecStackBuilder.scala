@@ -56,17 +56,18 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
     val handle: StackHandle[T] = new StackHandle[T] {
       val staticType: Type[T] = outer.staticType
 
-      def setDefinition(value: Quotes ?=> Expr[T]): Unit = {
-        type U <: T
-        given Type[U] = value.asTerm.tpe.asType.asInstanceOf[Type[U]]
+      def setDefinition(value: Expr[T]): Unit = {
+        val valueTpe = value.asTerm.tpe
 
-        initializeSymbol[U]
-
-        if (!(value.asTerm.tpe <:< TypeRepr.of[T])) {
+        if (!(valueTpe <:< TypeRepr.of[T])) {
           throw new IllegalAccessException("setDefinition expr does not match configured static type: " + Type.show[T])
         }
 
-        definition = Some(value(using symbol.get.asQuotes).asTerm)
+        type U <: T
+        given Type[U] = valueTpe.asType.asInstanceOf[Type[U]]
+
+        initializeSymbol[U]
+        definition = Some(value.asTerm.changeOwner(symbol.get))
       }
 
       def nestedQuotes: Quotes = {
