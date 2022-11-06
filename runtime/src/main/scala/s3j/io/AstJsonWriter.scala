@@ -3,6 +3,7 @@ package s3j.io
 import s3j.ast.{JsArray, JsBigDecimal, JsBigInt, JsBoolean, JsDouble, JsLong, JsNull, JsObject, JsString, JsValue}
 import s3j.io.util.WriterStateMachine
 
+import java.nio.{ByteBuffer, ByteOrder}
 import scala.collection.mutable
 
 object AstJsonWriter {
@@ -101,10 +102,16 @@ class AstJsonWriter extends JsonWriter {
     this
   }
 
-  def longValue(value: Long, unsigned: Boolean = false): JsonWriter = {
+  def longValue(value: Long): JsonWriter = {
     stateMachine.value()
-    if (unsigned) state.pushValue(JsBigInt(BigInt(java.lang.Long.toUnsignedString(value, 10))))
-    else state.pushValue(JsLong(value))
+    state.pushValue(JsLong(value))
+    this
+  }
+
+  def unsignedLongValue(value: Long): JsonWriter = {
+    stateMachine.value()
+    val bytes = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN).putLong(value)
+    state.pushValue(JsBigInt(BigInt(1, bytes.array())))
     this
   }
 

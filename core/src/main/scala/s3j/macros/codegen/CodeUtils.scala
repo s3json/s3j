@@ -9,7 +9,7 @@ import scala.quoted.*
 object CodeUtils {
   def placeholderValue[T](using Quotes, Type[T]): Expr[T] =
     (Type.of[T] match {
-      case '[ AnyRef ]  => '{ null }
+      case '[ AnyRef ]    => '{ null }
       case '[ Boolean ]   => Expr(false)
       case '[ Byte ]      => Expr(0.toByte)
       case '[ Short ]     => Expr(0.toShort)
@@ -98,31 +98,31 @@ object CodeUtils {
     caseEquals: Quotes ?=> T => Expr[Boolean],
     caseCode: Quotes ?=> T => Expr[Any],
     fallbackCode: Quotes ?=> Expr[Any]
-  )(using Quotes): Expr[Any] = {
-    val matched: Variable[Boolean] = Variable.create("matched")('{ false })
-    val sortedCases = cases.toVector.sortBy(caseHash)
+  )(using q: Quotes): Expr[Any] = {
+    import q.reflect.*
+    val caseDefs = Vector.newBuilder[CaseDef]
+    val matched = Variable.create[Boolean]("matched")
 
-    def generateNode(low: Int, high: Int)(using Quotes): Expr[Unit] = {
-      if (low == high) {
-        '{
-          if (${ caseEquals(sortedCases(low)) }) {
-            ${ matched := Expr(true) }
-            ${ caseCode(sortedCases(low)) }
-          }
-        }
-      } else if (low + 1 == high) {
-        val splitHash = caseHash(sortedCases(high))
-        '{ if ($inputHash < ${ Expr(splitHash) }) ${generateNode(low, low)} else ${generateNode(high, high)} }
-      } else {
-        val mid = (low + high) / 2
-        val splitHash = caseHash(sortedCases(mid))
-        '{ if ($inputHash < ${ Expr(splitHash) }) ${generateNode(low, mid - 1)} else ${generateNode(mid, high)} }
+    def caseCodeWrapper(c: T): Term = '{
+      if (${ caseEquals(c) }) {
+        ${ matched := '{ true} }
+        ${ caseCode(c) }
       }
+    }.asTerm
+
+    for ((h, cs) <- cases.groupBy(caseHash)) {
+      val code: Term =
+        if (cs.size == 1) caseCodeWrapper(cs.head)
+        else Block(cs.map(caseCodeWrapper).toList, Literal(UnitConstant()))
+
+      caseDefs += CaseDef(Literal(IntConstant(h)), None, code)
     }
 
+    caseDefs += CaseDef(Wildcard(), None, Literal(UnitConstant()))
+
     Variable.defineVariables(Seq(matched), '{
-      ${ generateNode(0, cases.size - 1) }
-      if (!$matched) ${ fallbackCode }
+      ${ Match(inputHash.asTerm, caseDefs.result().toList).asExpr }
+      if (!$matched) $fallbackCode
     })
   }
 }

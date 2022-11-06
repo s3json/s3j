@@ -1,6 +1,6 @@
 package s3j.io
 
-trait JsonWriter {
+abstract class JsonWriter {
   /** Write array header and enter array mode */
   def beginArray(): JsonWriter
 
@@ -19,8 +19,32 @@ trait JsonWriter {
   /** Write boolean value to stream */
   def boolValue(value: Boolean): JsonWriter
 
+  /** Write byte value to stream */
+  def byteValue(value: Byte): JsonWriter = longValue(value)
+
+  /** Write unsigned byte value to stream */
+  def unsignedByteValue(value: Byte): JsonWriter = longValue(value & 0xFF)
+
+  /** Write short value to stream */
+  def shortValue(value: Short): JsonWriter = longValue(value)
+
+  /** Write unsigned short value to stream */
+  def unsignedShortValue(value: Short): JsonWriter = longValue(value & 0xFFFF)
+
+  /** Write int value to stream */
+  def intValue(value: Int): JsonWriter = longValue(value)
+
+  /** Write unsigned int value to stream */
+  def unsignedIntValue(value: Int): JsonWriter = longValue(value & 0xFFFFFFFFL)
+
   /** Write long value to stream */
-  def longValue(value: Long, unsigned: Boolean = false): JsonWriter
+  def longValue(value: Long): JsonWriter
+
+  /** Write unsigned long value to stream */
+  def unsignedLongValue(value: Long): JsonWriter
+
+  /** Write float value to stream */
+  def floatValue(value: Float): JsonWriter = doubleValue(value)
 
   /** Write double value to stream */
   def doubleValue(value: Double): JsonWriter

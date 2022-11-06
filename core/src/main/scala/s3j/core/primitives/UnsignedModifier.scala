@@ -1,4 +1,4 @@
-package s3j.core.numbers
+package s3j.core.primitives
 
 import s3j.macros.modifiers.{Modifier, ModifierKey}
 

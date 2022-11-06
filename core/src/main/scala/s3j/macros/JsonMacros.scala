@@ -3,6 +3,7 @@ package s3j.macros
 import s3j.core.binary.BinaryPlugin
 import s3j.core.casecls.CaseClassPlugin
 import s3j.core.enums.EnumerationPlugin
+import s3j.core.primitives.PrimitivesPlugin
 import s3j.macros.generic.{BuiltinsPlugin, GenerationMode, PluginContextImpl}
 import s3j.macros.modifiers.BuiltinModifiers.InspectCodeModifier
 import s3j.macros.utils.MacroUtils
@@ -32,6 +33,7 @@ object JsonMacros {
     ctx.loadPlugin[CaseClassPlugin]()
     ctx.loadPlugin[EnumerationPlugin]()
     ctx.loadPlugin[BinaryPlugin]()
+    ctx.loadPlugin[PrimitivesPlugin]()
 
     // Load user-configured plugins:
     for (plugin <- MacroUtils.macroSettings(MacroUtils.UsePluginPrefix)) {

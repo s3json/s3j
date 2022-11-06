@@ -90,27 +90,29 @@ object NumberFormats {
       case other => DecoderUtils.throwUnexpected(reader, "a number", other)
     }
 
+  def decodeByte(reader: JsonReader): Byte = {
+    val r = decodeLong(reader, unsigned = false)
+    if (r < Byte.MinValue || r > Byte.MaxValue) reader.parseError("value is out of range for byte: " + r)
+    r.toByte
+  }
+
+  def decodeUnsignedByte(reader: JsonReader): Byte = {
+    val r = decodeLong(reader, unsigned = false)
+    if (r < 0 || r > 255) reader.parseError("value is out of range for unsigned byte: " + r)
+    r.toByte
+  }
+
   /** Signed byte format */
   given byteFormat: JsonFormat[Byte] with {
-    def encode(writer: JsonWriter, value: Byte): Unit = writer.longValue(value)
-    def decode(reader: JsonReader): Byte = {
-      val r = decodeLong(reader, unsigned = false)
-      if (r < Byte.MinValue || r > Byte.MaxValue) reader.parseError("value is out of range for byte: " + r)
-      r.toByte
-    }
-
+    def encode(writer: JsonWriter, value: Byte): Unit = writer.byteValue(value)
+    def decode(reader: JsonReader): Byte = decodeByte(reader)
     override def toString: String = "byteFormat"
   }
 
   /** Unsigned byte format */
   val unsignedByteFormat: JsonFormat[Byte] = new JsonFormat[Byte] {
-    def encode(writer: JsonWriter, value: Byte): Unit = writer.longValue(value & 0xFF)
-    def decode(reader: JsonReader): Byte = {
-      val r = decodeLong(reader, unsigned = false)
-      if (r < 0 || r > 255) reader.parseError("value is out of range for unsigned byte: " + r)
-      r.toByte
-    }
-
+    def encode(writer: JsonWriter, value: Byte): Unit = writer.unsignedByteValue(value)
+    def decode(reader: JsonReader): Byte = decodeUnsignedByte(reader)
     override def toString: String = "unsignedByteFormat"
   }
 
@@ -121,27 +123,29 @@ object NumberFormats {
     override def toString: String = "stringyByteFormat"
   }
 
+  def decodeShort(reader: JsonReader): Short = {
+    val r = decodeLong(reader, unsigned = false)
+    if (r < Short.MinValue || r > Short.MaxValue) reader.parseError("value is out of range for short: " + r)
+    r.toShort
+  }
+
+  def decodeUnsignedShort(reader: JsonReader): Short = {
+    val r = decodeLong(reader, unsigned = false)
+    if (r < 0 || r > 0xFFFF) reader.parseError("value is out of range for unsigned short: " + r)
+    r.toShort
+  }
+
   /** Signed short format */
   given shortFormat: JsonFormat[Short] with {
-    def encode(writer: JsonWriter, value: Short): Unit = writer.longValue(value)
-    def decode(reader: JsonReader): Short = {
-      val r = decodeLong(reader, unsigned = false)
-      if (r < Short.MinValue || r > Short.MaxValue) reader.parseError("value is out of range for short: " + r)
-      r.toShort
-    }
-
+    def encode(writer: JsonWriter, value: Short): Unit = writer.shortValue(value)
+    def decode(reader: JsonReader): Short = decodeShort(reader)
     override def toString: String = "shortFormat"
   }
 
   /** Unsigned short format */
   val unsignedShortFormat: JsonFormat[Short] = new JsonFormat[Short] {
-    def encode(writer: JsonWriter, value: Short): Unit = writer.longValue(value & 0xFFFF)
-    def decode(reader: JsonReader): Short = {
-      val r = decodeLong(reader, unsigned = false)
-      if (r < 0 || r > 0xFFFF) reader.parseError("value is out of range for unsigned short: " + r)
-      r.toShort
-    }
-
+    def encode(writer: JsonWriter, value: Short): Unit = writer.unsignedShortValue(value)
+    def decode(reader: JsonReader): Short = decodeUnsignedShort(reader)
     override def toString: String = "unsignedShortFormat"
   }
 
@@ -152,27 +156,29 @@ object NumberFormats {
     override def toString: String = "stringyShortFormat"
   }
 
+  def decodeInt(reader: JsonReader): Int = {
+    val r = decodeLong(reader, unsigned = false)
+    if (r < Int.MinValue || r > Int.MaxValue) reader.parseError("value is out of range for int: " + r)
+    r.toInt
+  }
+  
+  def decodeUnsignedInt(reader: JsonReader): Int = {
+    val r = decodeLong(reader, unsigned = false)
+    if (r < 0 || r > 0xFFFFFFFFL) reader.parseError("value is out of range for unsigned int: " + r)
+    r.toInt
+  }
+  
   /** Signed int format */
   given intFormat: JsonFormat[Int] with {
-    def encode(writer: JsonWriter, value: Int): Unit = writer.longValue(value)
-    def decode(reader: JsonReader): Int = {
-      val r = decodeLong(reader, unsigned = false)
-      if (r < Int.MinValue || r > Int.MaxValue) reader.parseError("value is out of range for int: " + r)
-      r.toInt
-    }
-
+    def encode(writer: JsonWriter, value: Int): Unit = writer.intValue(value)
+    def decode(reader: JsonReader): Int = decodeInt(reader)
     override def toString: String = "intFormat"
   }
 
   /** Unsigned int format */
   val unsignedIntFormat: JsonFormat[Int] = new JsonFormat[Int] {
-    def encode(writer: JsonWriter, value: Int): Unit = writer.longValue(value & 0xFFFFFFFFL)
-    def decode(reader: JsonReader): Int = {
-      val r = decodeLong(reader, unsigned = false)
-      if (r < 0 || r > 0xFFFFFFFFL) reader.parseError("value is out of range for unsigned int: " + r)
-      r.toInt
-    }
-
+    def encode(writer: JsonWriter, value: Int): Unit = writer.unsignedIntValue(value)
+    def decode(reader: JsonReader): Int = decodeUnsignedInt(reader)
     override def toString: String = "unsignedIntFormat"
   }
 
@@ -192,7 +198,7 @@ object NumberFormats {
 
   /** Unsigned long format */
   val unsignedLongFormat: JsonFormat[Long] = new JsonFormat[Long] {
-    def encode(writer: JsonWriter, value: Long): Unit = writer.longValue(value, unsigned = true)
+    def encode(writer: JsonWriter, value: Long): Unit = writer.unsignedLongValue(value)
     def decode(reader: JsonReader): Long = decodeLong(reader, unsigned = true)
     override def toString: String = "unsignedLongFormat"
   }

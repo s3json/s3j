@@ -127,10 +127,17 @@ class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
     this
   }
 
-  def longValue(value: Long, unsigned: Boolean): JsonWriter = {
+  def longValue(value: Long): JsonWriter = {
     stateMachine.value()
     preValue()
-    out.write(if (unsigned) java.lang.Long.toUnsignedString(value, 10) else java.lang.Long.toString(value, 10))
+    out.write(java.lang.Long.toString(value, 10))
+    this
+  }
+  
+  def unsignedLongValue(value: Long): JsonWriter = {
+    stateMachine.value()
+    preValue()
+    out.write(java.lang.Long.toUnsignedString(value, 10))
     this
   }
 

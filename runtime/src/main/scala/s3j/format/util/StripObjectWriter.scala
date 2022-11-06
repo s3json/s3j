@@ -10,7 +10,7 @@ import s3j.io.JsonWriter
  * 
  * Does not handle insane cases when objects are written as raw chunks
  */
-final case class StripObjectWriter(writer: JsonWriter) extends JsonWriter {
+final case class StripObjectWriter(val writer: JsonWriter) extends JsonWriter {
   private var _nesting: Int = 0
   
   def beginArray(): JsonWriter = {
@@ -39,7 +39,14 @@ final case class StripObjectWriter(writer: JsonWriter) extends JsonWriter {
 
   def key(key: String): JsonWriter = { writer.key(key); this }
   def boolValue(value: Boolean): JsonWriter = { writer.boolValue(value); this }
-  def longValue(value: Long, unsigned: Boolean): JsonWriter = { writer.longValue(value, unsigned); this }
+  def unsignedLongValue(value: Long): JsonWriter = writer.unsignedLongValue(value)
+  def longValue(value: Long): JsonWriter = writer.longValue(value)
+  override def unsignedIntValue(value: Int): JsonWriter = writer.unsignedIntValue(value)
+  override def intValue(value: Int): JsonWriter = writer.intValue(value)
+  override def unsignedShortValue(value: Short): JsonWriter = writer.unsignedShortValue(value)
+  override def shortValue(value: Short): JsonWriter = writer.shortValue(value)
+  override def unsignedByteValue(value: Byte): JsonWriter = writer.unsignedByteValue(value)
+  override def byteValue(value: Byte): JsonWriter = writer.byteValue(value)
   def doubleValue(value: Double): JsonWriter = { writer.doubleValue(value); this }
   def bigintValue(value: BigInt): JsonWriter = { writer.bigintValue(value); this }
   def bigdecValue(value: BigDecimal): JsonWriter = { writer.bigdecValue(value); this }
