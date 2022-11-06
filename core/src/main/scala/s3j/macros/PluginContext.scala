@@ -27,11 +27,4 @@ object PluginContext {
 }
 
 trait PluginContext extends BasicPluginContext {
-  type T
-  
-  /** @return Root generated type */
-  def generatedType: Type[T]
-
-  /** @return Generation mode decoded from requested type class */
-  def generationMode: GenerationMode
 }

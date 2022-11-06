@@ -9,4 +9,9 @@ object BuiltinModifiers {
     def key: ModifierKey[RequireImplicit.type] = this
     override def inheritable: Boolean = false
   }
+
+  case object InspectCodeModifier extends ModifierKey[InspectCodeModifier.type]("inspectCode") with Modifier {
+    def key: ModifierKey[InspectCodeModifier.this.type] = this
+    override def inheritable: Boolean = false
+  }
 }

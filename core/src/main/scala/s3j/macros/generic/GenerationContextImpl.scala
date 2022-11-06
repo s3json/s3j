@@ -3,10 +3,10 @@ package s3j.macros.generic
 import s3j.format.{JsonDecoder, JsonEncoder}
 import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, GenerationRejection}
 import s3j.macros.codegen.{AssistedImplicits, Position as XPosition}
-import s3j.macros.{GenerationContext, PluginCapability, PluginContext}
+import s3j.macros.{CodecExpr, GenerationContext, PluginCapability, PluginContext}
 import s3j.macros.modifiers.{BuiltinModifiers, ModifierSet}
 import s3j.macros.schema.SchemaExpr
-import s3j.macros.traits.{ErrorReporting, NestedBuilder, NestedResult, ReportingBuilder}
+import s3j.macros.traits.{ErrorReporting, GenerationResult, NestedBuilder, ReportingBuilder}
 import s3j.macros.utils.{ForbiddenMacroUtils, GenerationPath, MacroUtils, ReportingUtils}
 import s3j.schema.JsonSchema
 
@@ -17,7 +17,7 @@ import scala.quoted.{Expr, Quotes, Type}
 import scala.quoted.runtime.StopMacroExpansion
 import scala.quoted.runtime.impl.QuotesImpl
 
-private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
+private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
   import q.reflect.*
   import q.{reflect => or}
 
@@ -25,10 +25,10 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
   case class StackEntry(target: TypeRepr, modifiers: ModifierSet, path: Seq[GenerationPath], label: Option[String],
                         mode: GenerationMode)
 
-  case class GenerationTask(stack: List[StackEntry]) {
+  case class GenerationTask(stack: List[StackEntry], root: TypeRepr) {
     type T
 
-    val isRoot: Boolean = stack.tail.isEmpty
+    val isRoot: Boolean = stack.tail.isEmpty || stack.head.target =:= root
     val target: TypeRepr = stack.head.target
     val targetType: Type[T] = target.asType.asInstanceOf[Type[T]]
     val typeSymbol: Symbol = target.typeSymbol
@@ -37,6 +37,9 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
 
     val basicKey: BasicCachingKey = BasicCachingKey(target, modifiers)
     val implicitKey: ImplicitCachingKey = ImplicitCachingKey(target)
+
+    /** @return Generation task with appended stack entry */
+    def nestedTask(e: StackEntry): GenerationTask = copy(stack = e :: stack)
   }
 
   private abstract class BasicContextImpl(val task: GenerationTask, val owner: PluginContainer)
@@ -86,7 +89,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
           this
         }
 
-        def build(): NestedResult[T] =
+        def build(): GenerationResult[T] =
           outer.generate(task.copy(
             stack = StackEntry(
               target = or.TypeRepr.of[T].dealias.simplified,
@@ -122,9 +125,13 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       }
 
       def build(): ErrorReporting = {
-        val nextTask = GenerationTask(_stack.reverseIterator.foldLeft(task.stack) { (list, entry) =>
-          StackEntry(TypeRepr.of(using entry.t), ModifierSet.empty, entry.path, entry.label, generationMode) :: list
-        })
+        val nextTask = GenerationTask(
+          // _stack.map(...) ::: task.stack
+          stack = _stack.reverseIterator.foldLeft(task.stack) { (list, entry) =>
+            StackEntry(TypeRepr.of(using entry.t), ModifierSet.empty, entry.path, entry.label, generationMode) :: list
+          },
+          root = task.root
+        )
 
         outer.report.transform(
           msgTransformer = Some(formatMessage(_, nextTask, Some(_plugin))),
@@ -174,24 +181,13 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
     }
   }
 
-  private def createHandle(task: GenerationTask, key: CachingKey, identity: AnyRef, simpleGen: Boolean,
-                           generate: SerializerHandle => Unit): SerializerHandle =
-  {
-    val ret = new SerializerHandle
-
-    ret.generationMode = task.mode
-    ret.variableName = task.typeSymbol.name + "_" + _serializerIdx
-    ret.targetType = task.target
-    ret.identity = identity
+  private def createHandle(task: GenerationTask, key: CachingKey, identity: AnyRef): SerializerHandle = {
+    val ret = new SerializerHandle(task.mode, task.target, identity)
 
     // Store cache _before_ generation, so recursive types won't be regenerated infinitely
-    _serializerIdx += 1
     _serializerSet.add(ret)
     _serializers.put(task.basicKey, ret)
     _serializers.put(key, ret)
-
-    ForbiddenMacroUtils.clearQuotesCache()
-    generate(ret)
 
     ret
   }
@@ -270,18 +266,22 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       return _serializers(key)
     }
 
-    createHandle(task, key, key.identity, simpleGen = context.candidate.exists(_.simpleGeneration), h => {
-      if (h.generationMode.schema) {
-        h.storeSchema(context.doGeneration(c => c.generateSchema()))
-      } else {
-        h.initializeDefault()
-        h.definition = context.doGeneration(c => c.generate(using h.variableSymbol.asQuotes)()).asTerm
-      }
-    })
+    val h = createHandle(task, key, key.identity)
+    ForbiddenMacroUtils.clearQuotesCache()
+
+    if (h.mode.schema) {
+      val expr = context.doGeneration(_.generateSchema(using h.nestedQuotes)())
+      h.setSchema(expr.asInstanceOf[SchemaExpr[h.T]])
+    } else {
+      val expr = context.doGeneration(c => c.generate(using h.nestedQuotes)())
+      h.setCodec(expr.asInstanceOf[CodecExpr[h.T]])
+    }
+
+    h
   }
 
-  private def searchImplicits(t: TypeRepr, behaviors: Set[ImplicitBehavior]): AssistedImplicits.SearchResult = {
-    val assistedHelper = generationMode match {
+  private def searchImplicits(entry: StackEntry, behaviors: Set[ImplicitBehavior]): AssistedImplicits.SearchResult = {
+    val assistedHelper = entry.mode match {
       case GenerationMode.Decoder | GenerationMode.StringDecoder =>
         Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Decoder")
 
@@ -295,38 +295,41 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
         Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Schema")
     }
 
+    val t = entry.mode.appliedType(entry.target)
     AssistedImplicits.search(t, behaviors.flatMap(_.extraLocations), Some(assistedHelper))
   }
 
   private def generateImplicit(task: GenerationTask, r: AssistedImplicits.SearchSuccess)(using q: Quotes): Expr[Any] = {
     import q.reflect.*
     val holes = r.holes.map { tpe =>
-      val (subMode, target) = GenerationMode.decode(TypeRepr.of(using tpe))
-      if (!generationMode.modeCompatible(subMode)) {
-        throw new RuntimeException("Implicit hole has an incompatible generation mode: mode=" + generationMode +
+      val (subMode, target) = GenerationMode.decodeRaw(TypeRepr.of(using tpe))
+      if (!task.mode.modeCompatible(subMode)) {
+        throw new RuntimeException("Implicit hole has an incompatible generation mode: mode=" + task.mode +
           ", hole=" + Type.show(using tpe))
       }
 
-      val subTask = GenerationTask(
-        stack = StackEntry(
-          target = target.asInstanceOf[outer.q.reflect.TypeRepr],
-          modifiers = task.modifiers,
-          path = Nil,
-          label = None,
-          mode = subMode
-        ) :: task.stack
-      )
+      val subTask = task.nestedTask(StackEntry(
+        target = target.asInstanceOf[outer.q.reflect.TypeRepr],
+        modifiers = task.modifiers,
+        path = Nil,
+        label = None,
+        mode = subMode
+      ))
 
-      generate(subTask).reference.asExpr
+      generate(subTask).reference
     }
 
     r.expr(holes)
   }
 
-  def generateRoot(tpe: TypeRepr, modifiers: ModifierSet): Symbol =
-    generate(GenerationTask(
-      stack = StackEntry(tpe, modifiers, Nil, None, generationMode) :: Nil
-    )).variableSymbol
+  def generate[T](mode: GenerationMode, modifiers: ModifierSet)(using Type[T]): GenerationResult[T] = {
+    val handle = generate(GenerationTask(
+      stack = StackEntry(TypeRepr.of[T], modifiers, Nil, None, mode) :: Nil,
+      root = TypeRepr.of[T]
+    ))
+
+    new GenerationResultImpl[T](handle)
+  }
 
   private def generate(task: GenerationTask): SerializerHandle = {
     if (_serializers.contains(task.basicKey)) {
@@ -337,7 +340,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       .map(c => c.instance.implicitBehavior(task.modifiers)(using q, this, task.targetType) -> c)
 
     val suppressImplicitsReason: Option[String] =
-      if (task.isRoot || task.typeSymbol == typeSymbol) Some("serializer for root type is always generated")
+      if (task.isRoot) Some("serializer for root type is always generated")
       else if (implicitBehaviors.exists(_._1.suppressed)) {
         val reasons = implicitBehaviors
           .filter(_._1.suppressed)
@@ -354,22 +357,18 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl[_] =>
       return _serializers(task.implicitKey)
     }
 
-    searchImplicits(generationMode.appliedType(task.target), implicitBehaviors.map(_._1)) match {
+    searchImplicits(task.stack.head, implicitBehaviors.map(_._1)) match {
       case success: AssistedImplicits.SearchSuccess =>
-        createHandle(task, task.implicitKey, ImplicitIdentity, simpleGen = true, h => {
-          if (h.generationMode.schema) {
-            val expr = generateImplicit(task, success)(using h.variableSymbol.asQuotes)
-            h.initialize(expr.asTerm.tpe)
-            h.definition = expr.asTerm
+        val h = createHandle(task, task.implicitKey, ImplicitIdentity)
+        val expr = generateImplicit(task, success)(using h.nestedQuotes)
 
-            type T
-            given Type[T] = h.targetType.asType.asInstanceOf[Type[T]]
-            h.schemaDefinition = SchemaExpr.fromExpr[T](expr.asExprOf[JsonSchema[T]])
-          } else {
-            h.initializeDefault()
-            h.definition = generateImplicit(task, success)(using h.variableSymbol.asQuotes).asTerm
-          }
-        })
+        if (h.mode.schema) {
+          h.setSchema(expr.asExprOf[JsonSchema[h.T]])
+        } else {
+          h.setCodec(expr)
+        }
+
+        h
 
       case AssistedImplicits.SearchFailure(explanation) =>
         if (task.modifiers.contains(BuiltinModifiers.RequireImplicit)) {

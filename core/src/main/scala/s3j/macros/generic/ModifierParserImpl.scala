@@ -12,7 +12,7 @@ import scala.quoted.{Expr, Quotes, Type}
 import scala.quoted.runtime.StopMacroExpansion
 import scala.util.control.NonFatal
 
-private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl[_] =>
+private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl =>
   import q.reflect.*
 
   // == State: =========================================================================================================

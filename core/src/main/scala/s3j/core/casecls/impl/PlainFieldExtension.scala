@@ -6,7 +6,7 @@ import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.codegen.Variable
 import s3j.macros.generic.GenerationConfidence
 import s3j.macros.schema.SchemaExpr
-import s3j.macros.traits.NestedResult
+import s3j.macros.traits.GenerationResult
 
 import scala.annotation.threadUnsafe
 import scala.quoted.{Expr, Quotes, Type}
@@ -21,14 +21,14 @@ private[casecls] class PlainFieldExtension extends CaseClassExtension {
     val handledKeys: Set[String] = Set(field.key)
     val handlesDynamicKeys: Boolean = false
 
-    lazy val nested: NestedResult[T] = c
+    lazy val nested: GenerationResult[T] = c
       .nested[T]
       .modifiers(field.ownModifiers)
       .build()
 
     def generateEncoder(writer: Expr[JsonWriter], value: Expr[T])
                        (using Quotes, GenerationEnvironment): Expr[Any] =
-      '{ $writer.key(${ Expr(field.key) }); ${nested.encoder}.encode($writer, $value) }
+      '{ $writer.key(${ Expr(field.key) }); ${ nested.encode(writer, value) } }
 
     def generateDecoder(using q: Quotes, env: DecodingEnvironment): DecodingCode =
       new DecodingCode {
@@ -36,7 +36,7 @@ private[casecls] class PlainFieldExtension extends CaseClassExtension {
         val usedVariables: Seq[Variable[_]] = Seq(result)
 
         def decodeKey(key: String, reader: Expr[JsonReader])(using Quotes): Expr[Any] =
-          result := '{ ${nested.decoder}.decode($reader) }
+          result := nested.decode(reader)
 
         def decodeFinal()(using Quotes): Expr[Any] = env.checkRequiredKey(field.key)
         def decodeResult()(using Quotes): Expr[Any] = result.value

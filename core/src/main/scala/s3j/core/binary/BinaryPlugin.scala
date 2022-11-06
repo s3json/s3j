@@ -6,7 +6,7 @@ import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, Gen
 import s3j.macros.generic.{GenerationConfidence, ImplicitBehavior}
 import s3j.macros.modifiers.{ModifierParser, ModifierSet}
 import s3j.macros.schema.SchemaExpr
-import s3j.macros.{GenerationContext, Plugin, PluginContext}
+import s3j.macros.{CodecExpr, GenerationContext, Plugin, PluginContext}
 
 import scala.quoted.runtime.impl.TypeImpl
 import scala.quoted.{Expr, Quotes, Type, quotes}
@@ -43,7 +43,7 @@ class BinaryPlugin extends Plugin {
           def identity: AnyRef = modifiers(BinaryFormatModifier)
           override def simpleGeneration: Boolean = true
 
-          def generate(using Quotes)(): Expr[Any] = {
+          def generate(using Quotes)(): CodecExpr[Any] = {
             val fmt = modifiers(BinaryFormatModifier).format
             fn(fmt.fn)
           }

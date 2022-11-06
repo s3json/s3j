@@ -6,7 +6,7 @@ import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, Gen
 import s3j.macros.generic.{GenerationConfidence, ImplicitBehavior}
 import s3j.macros.modifiers.{ModifierParser, ModifierSet}
 import s3j.macros.schema.SchemaExpr
-import s3j.macros.{GenerationContext, Plugin, PluginContext}
+import s3j.macros.{CodecExpr, GenerationContext, Plugin, PluginContext}
 import s3j.schema.{BasicSchemas, JsonSchema}
 
 import scala.quoted.{Expr, Quotes, Type}
@@ -24,8 +24,8 @@ class NumbersPlugin extends Plugin {
     new GenerationCandidate {
       val confidence: GenerationConfidence = GenerationConfidence.Certain
       val identity: AnyRef = UnsignedNumberIdentity
-      def generate(using Quotes)(): Expr[Any] = expr
-      def generateSchema(using Quotes)(): SchemaExpr[Any] = SchemaExpr.fromUntypedExpr(schema).asErased
+      def generate(using Quotes)(): CodecExpr[?] = expr
+      def generateSchema(using Quotes)(): SchemaExpr[?] = SchemaExpr.fromUntypedExpr(schema).asErased
       override def simpleGeneration: Boolean = true
     }
 

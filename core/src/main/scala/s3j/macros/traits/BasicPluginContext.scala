@@ -9,9 +9,6 @@ import scala.quoted.Quotes
 
 /** Basic plugin context methods to use in generation contexts */
 trait BasicPluginContext {
-  /** @return Generation mode decoded from requested type class */
-  def generationMode: GenerationMode
-
   /** Error reporting methods */
   val report: ErrorReporting
   

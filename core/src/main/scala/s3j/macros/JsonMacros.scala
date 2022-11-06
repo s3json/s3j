@@ -3,7 +3,8 @@ package s3j.macros
 import s3j.core.binary.BinaryPlugin
 import s3j.core.casecls.CaseClassPlugin
 import s3j.core.enums.EnumerationPlugin
-import s3j.macros.generic.{BuiltinsPlugin, PluginContextImpl}
+import s3j.macros.generic.{BuiltinsPlugin, GenerationMode, PluginContextImpl}
+import s3j.macros.modifiers.BuiltinModifiers.InspectCodeModifier
 import s3j.macros.utils.MacroUtils
 
 import java.util.{Base64, ServiceLoader}
@@ -12,12 +13,20 @@ import scala.quoted.*
 import scala.util.control.NonFatal
 
 object JsonMacros {
+  /**
+   * @return Derived JSON codec
+   */
   inline def derived[T]: T = ${ derivedMacro[T] }
 
-  private def derivedMacro[T](using q: Quotes, tt: Type[T]): Expr[T] = {
-    import q.reflect.*
-    val ctx = new PluginContextImpl[q.type](TypeRepr.of[T])
-    
+  /**
+   * Create new s3j context to generate codecs with it.
+   *
+   * @param q Primary quotes object to use
+   * @return  Fresh plugin context
+   */
+  def createContext(using q: Quotes): FreshPluginContext = {
+    val ctx = new PluginContextImpl
+
     // Load builtin plugins:
     ctx.loadPlugin[BuiltinsPlugin]()
     ctx.loadPlugin[CaseClassPlugin]()
@@ -29,17 +38,25 @@ object JsonMacros {
       ctx.loadPlugin(plugin)
     }
 
-    val effectiveModifiers = ctx.symbolModifiers(ctx.typeSymbol).inherited ++
+    ctx
+  }
+
+  private def derivedMacro[T](using q: Quotes, tt: Type[T]): Expr[T] = {
+    import q.reflect.*
+    val ctx = createContext
+
+    val decodedMode = GenerationMode.decode[T]
+    val effectiveModifiers = ctx.symbolModifiers(TypeRepr.of[decodedMode.I].typeSymbol).inherited ++
       ctx.symbolModifiers(Symbol.spliceOwner).own
 
-    val root = ctx.generateRoot(TypeRepr.of(using ctx.generatedType), effectiveModifiers)
-    val r = ctx.buildResult(root)
+    val root = ctx.generate[decodedMode.I](decodedMode.mode, effectiveModifiers)
+    val result = ctx.result(root.raw)
     
-    if (ctx.inspectCode) {
+    if (effectiveModifiers.contains(InspectCodeModifier)) {
       report.errorAndAbort("\u001b[1;32mGenerated code (@inspectCode annotation):\u001b[0m " +
-        r.show(using Printer.TreeAnsiCode))
+        result.asTerm.show(using Printer.TreeAnsiCode))
     }
 
-    r.asExprOf[T]
+    result.asExprOf[T]
   }
 }

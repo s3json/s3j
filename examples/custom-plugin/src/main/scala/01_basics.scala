@@ -1,4 +1,4 @@
-import s3j.macros.{GenerationContext, Plugin, PluginContext}
+import s3j.macros.{CodecExpr, GenerationContext, Plugin, PluginContext}
 
 import scala.annotation.StaticAnnotation
 import s3j.annotations.usePlugin
@@ -41,7 +41,7 @@ class MeowingPlugin extends Plugin {
     else new GenerationCandidate {
       def confidence: GenerationConfidence = GenerationConfidence.Certain
       def identity: AnyRef = MeowingIdentity
-      def generate(using Quotes)(): Expr[Any] = '{ MeowingRuntime.meowingCodec }
+      def generate(using Quotes)(): CodecExpr[?] = '{ MeowingRuntime.meowingCodec }
       def generateSchema(using Quotes)(): SchemaExpr[Any] = ???
       override def simpleGeneration: Boolean = true
     }

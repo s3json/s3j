@@ -8,7 +8,7 @@ import s3j.io.{JsonReader, JsonToken, JsonWriter}
 import s3j.macros.codegen.Variable
 import s3j.macros.generic.GenerationConfidence
 import s3j.macros.schema.SchemaExpr
-import s3j.macros.traits.NestedResult
+import s3j.macros.traits.GenerationResult
 
 import scala.quoted.*
 
@@ -19,7 +19,7 @@ class OptionExtension extends CaseClassExtension {
                                   (using Quotes, Type[T])
   extends ObjectField[Option[T]] {
     val nullOption: Boolean = field.fieldModifiers.contains(NullOptionModifier.key)
-    lazy val nested: NestedResult[T] = c.nested[T]
+    lazy val nested: GenerationResult[T] = c.nested[T]
       .modifiers(field.ownModifiers)
       .build()
 
@@ -34,10 +34,13 @@ class OptionExtension extends CaseClassExtension {
       
       if (nullOption) '{
         $writer.key($keyExpr)
-        if ($value.isDefined) ${nested.encoder}.encode($writer, $value.get)
+        if ($value.isDefined) ${ nested.encode(writer, '{ $value.get }) }
         else $writer.nullValue()
       } else '{ 
-        if ($value.isDefined) { $writer.key($keyExpr); ${nested.encoder}.encode($writer, $value.get) } 
+        if ($value.isDefined) { 
+          $writer.key($keyExpr)
+          ${ nested.encode(writer, '{ $value.get }) } 
+        } 
       }
     }
 

@@ -42,7 +42,7 @@ lazy val `core-internal` = (project in file("core-internal"))
   )
 
 lazy val schema = (project in file("schema"))
-  .dependsOn(runtime, `core-internal` % Provided)
+  .dependsOn(runtime, `core-internal` % "compile-internal, test-internal")
   .settings(commonSettings)
   .settings(
     name := "s3j-schema"
@@ -101,11 +101,7 @@ lazy val `interop-sbt` = (project in file("interop/sbt-plugin"))
 
 def exampleProject(exampleName: String): Project = Project("example-" + exampleName, file("examples/" + exampleName))
   .dependsOn(core)
-  .settings(commonSettings)
-  .settings(
-    name := "s3j-example-" + exampleName,
-    publishArtifact := false,
-    publishTo := None
-  )
+  .settings(commonSettings, notPublished)
+  .settings(name := "s3j-example-" + exampleName)
 
 lazy val exampleCustomPlugin = exampleProject("custom-plugin").dependsOn(schema)

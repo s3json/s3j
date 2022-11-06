@@ -6,13 +6,13 @@ import s3j.core.enums.modifiers.{AllowBufferingModifier, DiscriminatorFieldModif
 import s3j.format.util
 import s3j.format.util.{DecoderUtils, ObjectFormatUtils}
 import s3j.io.{JsonReader, JsonToken, JsonWriter}
-import s3j.macros.GenerationContext
+import s3j.macros.{GenerationContext, CodecExpr}
 import s3j.macros.GenerationContext.GenerationCandidate
 import s3j.macros.codegen.{CodeUtils, Variable}
 import s3j.macros.generic.GenerationConfidence
 import s3j.macros.modifiers.ModifierSet
 import s3j.macros.schema.SchemaExpr
-import s3j.macros.traits.NestedResult
+import s3j.macros.traits.GenerationResult
 
 import scala.annotation.threadUnsafe
 import scala.quoted.{Expr, Quotes, Type, quotes}
@@ -26,7 +26,7 @@ extends GenerationCandidate {
     given caseType: Type[C] = sym.typeRef.asType.asInstanceOf[Type[C]]
 
     @threadUnsafe
-    lazy val nested: NestedResult[C] = c.nested[C].modifiers(mods).build()
+    lazy val nested: GenerationResult[C] = c.nested[C].modifiers(mods).build()
 
     def singletonValue(using Quotes): Expr[C] = {
       import quotes.reflect.*
@@ -45,7 +45,7 @@ extends GenerationCandidate {
           ObjectFormatUtils.expectEndObject($reader)
           $singletonValue
         }
-      } else '{ ${nested.decoder}.decode($reader) }
+      } else nested.decode(reader)
   }
 
   private case class EnumCaseIdentity(discriminator: String)
@@ -81,7 +81,7 @@ extends GenerationCandidate {
 
     def body(writer: Expr[JsonWriter])(using Quotes): Expr[Any] =
       if (c.singleton) '{}
-      else '{ ${c.nested.encoder}.encode($writer, $value) }
+      else c.nested.encode(writer, value)
 
     '{
       val innerWriter = ObjectFormatUtils.encodeDiscriminator($writer, ${ Expr(discriminatorField) },
@@ -205,7 +205,7 @@ extends GenerationCandidate {
       case Behavior.ForceObject => generateObjectDecoder(reader)
     }
 
-  def generate(using Quotes)(): Expr[Any] = CodeUtils.makeCodec(c.generationMode)(
+  def generate(using Quotes)(): CodecExpr[?] = CodeUtils.makeCodec(c.generationMode)(
     encoder = generateEncoder _,
     decoder = generateDecoder _
   )

@@ -6,7 +6,7 @@ import s3j.core.casecls.modifiers.UnknownKeysModifier
 import s3j.format.util.{DecoderUtils, ObjectFormatUtils}
 import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat, util}
 import s3j.io.{JsonReader, JsonToken, JsonWriter, KeyHandle}
-import s3j.macros.GenerationContext
+import s3j.macros.{CodecExpr, GenerationContext}
 import s3j.macros.GenerationContext.GenerationCandidate
 import s3j.macros.codegen.{CodeUtils, Variable}
 import s3j.macros.generic.{GenerationConfidence, GenerationMode}
@@ -36,7 +36,7 @@ private[casecls] class CaseClassCandidate[T](modifiers: ModifierSet)(using c: Ge
     new GenerationCandidate {
       def confidence: GenerationConfidence = 500
       def identity: AnyRef = field.identity
-      def generate(using q: Quotes)(): Expr[Any] = CaseClassUtils.generateCode(field).format(c.generationMode)
+      def generate(using q: Quotes)(): CodecExpr[?] = CaseClassUtils.generateCode(field).format(c.generationMode)
       def generateSchema(using Quotes)(): SchemaExpr[?] = CaseClassUtils.generateSchema[T](field)
     }
 }

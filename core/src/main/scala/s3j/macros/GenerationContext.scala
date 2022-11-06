@@ -48,7 +48,7 @@ object GenerationContext {
     def identity: AnyRef
 
     /** @return Actual generated code for serializer */
-    def generate(using Quotes)(): Expr[Any]
+    def generate(using Quotes)(): CodecExpr[?]
 
     /** @return Generated JSON schema for serializer */
     def generateSchema(using Quotes)(): SchemaExpr[?]
@@ -59,6 +59,14 @@ object GenerationContext {
 }
 
 trait GenerationContext extends BasicPluginContext {
+  type T
+
+  /** @return Root generated type */
+  def generatedType: Type[T]
+
+  /** @return Generation mode decoded from requested type class */
+  def generationMode: GenerationMode
+
   /** @return New builder for nested serializer */
   def nested[T](using Type[T]): NestedBuilder[T]
 

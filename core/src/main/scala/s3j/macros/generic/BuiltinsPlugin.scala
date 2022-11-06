@@ -2,7 +2,7 @@ package s3j.macros.generic
 
 import s3j.annotations.naming.*
 import s3j.annotations.schema.*
-import s3j.annotations.requireImplicit
+import s3j.annotations.{requireImplicit, inspectCode}
 import s3j.core.casecls.modifiers.FieldCaseModifier
 import s3j.core.enums.modifiers.EnumCaseModifier
 import s3j.macros.modifiers.ModifierParser.{AnnotationModifier, StoredModifier, TextModifier}
@@ -67,6 +67,7 @@ class BuiltinsPlugin extends Plugin {
   /** @return Modifier parser for this plugin */
   override def modifierParser(using c: PluginContext): ModifierParser = ModifierParser.builder
     .parse[requireImplicit](BuiltinModifiers.RequireImplicit)
+    .parse[inspectCode](BuiltinModifiers.InspectCodeModifier)
     .parseFn[capitalizedKebabCase](parseCaseConvention(CaseConvention.CapitalizedKebabCase))
     .parseFn[kebabCase](parseCaseConvention(CaseConvention.KebabCase))
     .parseFn[pascalCase](parseCaseConvention(CaseConvention.PascalCase))

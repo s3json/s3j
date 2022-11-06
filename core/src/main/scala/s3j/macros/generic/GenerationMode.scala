@@ -8,13 +8,37 @@ import scala.compiletime.error
 import scala.quoted.*
 
 object GenerationMode {
+  /** Decoded generation mode with inner type */
+  trait Decoded[T] {
+    /** @return Decoded generation mdoe */
+    def mode: GenerationMode
+
+    /** Inner type corresponding to type `T`. I.e. if `T =:= JsonFormat[String]`, then `I =:= String` */
+    type I
+
+    /** Type tag for inner type */
+    given tpe: Type[I]
+  }
+
+  /** A typed version of [[decodeRaw]] */
+  def decode[T](using q: Quotes, tt: Type[T]): Decoded[T] = {
+    import q.reflect.*
+    val (r_mode, inner) = decodeRaw(TypeRepr.of[T])
+
+    new Decoded[T] {
+      def mode: GenerationMode = r_mode
+      type I
+      val tpe: Type[I] = inner.asType.asInstanceOf[Type[I]]
+    }
+  }
+
   /**
    * Decode generation mode from applied type. E.g. `decode(JsonFormat[Something])` returns `(Format, Something)`.
    *
    * @param t Applied type to decode
    * @return  Decoded generation mode and actual type to be generated
    */
-  def decode(using q: Quotes)(t: q.reflect.TypeRepr): (GenerationMode, q.reflect.TypeRepr) = {
+  def decodeRaw(using q: Quotes)(t: q.reflect.TypeRepr): (GenerationMode, q.reflect.TypeRepr) = {
     import q.reflect.*
 
     def throwError: Nothing =

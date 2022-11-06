@@ -17,5 +17,5 @@ trait NestedBuilder[T] {
   def generationPath(path: GenerationPath*): this.type
 
   /** @return Reference for nested serializer */
-  def build(): NestedResult[T]
+  def build(): GenerationResult[T]
 }
