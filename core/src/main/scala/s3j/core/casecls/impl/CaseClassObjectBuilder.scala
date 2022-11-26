@@ -3,7 +3,7 @@ package s3j.core.casecls.impl
 import s3j.core.casecls.CaseClassContext.*
 import s3j.core.casecls.{CaseClassContext, CaseClassExtension}
 import s3j.core.casecls.impl.CaseClassObjectBuilder.{FieldIdentity, ObjectIdentity, StackEntry}
-import s3j.core.casecls.modifiers.{FieldCaseModifier, FieldKeyModifier, UnknownKeysModifier}
+import s3j.core.casecls.modifiers.{FieldCaseModifier, FieldKeyModifier, KeyPrefixModifier, UnknownKeysModifier}
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.GenerationContext
 import s3j.macros.PluginContext.ExtensionRegistration
@@ -54,6 +54,10 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
     .stackEntries(reportingStackBase:_*)
     .build()
 
+  private val keyPrefix: Option[String] = outer.modifiers
+    .get(KeyPrefixModifier).map(_.prefix)
+    .filter(_.nonEmpty)
+
   private class FieldImpl(val ctorField: Symbol, val listIndex: Int) {
     val classField: Symbol = typeSymbol.fieldMember(ctorField.name)
     val fieldType: TypeRepr = generatedType.memberType(ctorField).substituteTypes(typeParams, typeArgs).simplified.dealias
@@ -66,13 +70,17 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
      *
      * Use [[result.handledKeys]] and [[result.handlesDynamicKeys]] to query actual keys for this field.
      */
-    val baseKey: String =
-      ownModifiers.get(FieldKeyModifier).map(_.fieldKey).getOrElse {
-        inheritedModifiers
-          .get(FieldCaseModifier)
-          .fold(CaseConvention.NoConvention)(_.value)
-          .transform(ctorField.name)
+    val baseKey: String = {
+      val caseConvention = inheritedModifiers(FieldCaseModifier).value
+      val ownKey = ownModifiers
+        .get(FieldKeyModifier).map(_.fieldKey)
+        .getOrElse(caseConvention.transform(ctorField.name))
+
+      keyPrefix match {
+        case Some(prefix) => caseConvention.concat(prefix, ownKey)
+        case None => ownKey
       }
+    }
 
     val reportPosition: Option[XPosition] = ctorField.pos.map(XPosition.apply(_))
     val reportingStack: Seq[ReportingBuilder.StackEntry] = reportingStackBase :+
@@ -130,10 +138,14 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
       private val _typeRepr: TypeRepr = TypeRepr.of[T].simplified.dealias
       private val _typeSymbol: Symbol = _typeRepr.typeSymbol
       private var _modifiers: ModifierSet =
-        stack.head.modifiers ++ c.symbolModifiers(_typeSymbol).inherited ++ f.ownModifiers
+        ModifierSet.inherit(stack.head.modifiers, f.ownModifiers, c.symbolModifiers(_typeSymbol).inherited)
 
       private var _path: Seq[GenerationPath] = Vector.empty
       private var _label: Option[String] = None
+
+      if (!_typeSymbol.isClassDef || !_typeSymbol.flags.is(Flags.Case)) {
+        throw new IllegalArgumentException("Cannot generate nested model for non-case class: " + Type.show[T])
+      }
 
       def discardModifiers(): this.type = {
         _modifiers = ModifierSet.empty
@@ -349,6 +361,8 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
           def dynamicKeyNames: Option[SchemaExpr[String]] = c.dynamicKey.dynamicKeyNames
           override def rootSchema: Option[SchemaExpr.Inlined[R]] = Some(ownRootSchema)
         }
+
+      override def toString: String = s"ObjectField(fields=[${fields.mkString(", ")}])"
     }
   }
 }

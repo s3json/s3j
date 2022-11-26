@@ -263,4 +263,20 @@ class MacroTest extends AnyFlatSpec with Matchers {
     Test(Array(-1, -1), Array(-1, -2)).toJsonString shouldBe "{\"x\":\"__8\",\"y\":\"fffe\"}"
     // Array[Byte].equals is not well-defined, so no decoding for now.
   }
+
+  it should "generate inline objects" in {
+    case class TestA(x: Int, y: Int)
+    case class Test(a: String, b: Boolean, @inlineObject c: TestA) derives JsonFormat
+
+    Test("q", true, TestA(12, 23)).toJsonString shouldBe """{"a":"q","b":true,"x":12,"y":23}"""
+    """{"a":"q","b":true,"x":12,"y":23}""".fromJson[Test] shouldBe Test("q", true, TestA(12, 23))
+  }
+
+  it should "generate inline objects with key prefixes" in {
+    case class TestA(x: Int, y: Int)
+    case class Test(@inlineObject @keyPrefix("a") a: TestA, @inlineObject @keyPrefix("b") b: TestA) derives JsonFormat
+
+    Test(TestA(12, 23), TestA(45, 56)).toJsonString shouldBe """{"ax":12,"ay":23,"bx":45,"by":56}"""
+    """{"ax":12,"ay":23,"bx":45,"by":56}""".fromJson[Test] shouldBe Test(TestA(12, 23), TestA(45, 56))
+  }
 }
