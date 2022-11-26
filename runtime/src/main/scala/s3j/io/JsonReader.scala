@@ -119,4 +119,13 @@ abstract class JsonReader {
 
   /** Decode double value from stream */
   def readDouble(): Double = NumberFormats.decodeDouble(this)
+
+  /** Decode string value from the stream */
+  def readString(): String = DecoderUtils.decodeStringRaw(this, Int.MaxValue)
+
+  /**
+   * Decode string value from stream up to length limit, returning `null` (and leaving reader in an undefined state)
+   * when limit is exhausted
+   */
+  def readString(lengthLimit: Int): String | Null = DecoderUtils.decodeStringRaw(this, lengthLimit)
 }

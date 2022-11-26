@@ -118,8 +118,19 @@ object PrimitiveSpecification {
     ),
     unsigned = None
   )
+  
+  val String: PrimitiveSpecification[String] = PrimitiveSpecification(
+    typeName = "java.lang.String",
+    default = new FormatSpecification[String](
+      encode = (w, v) => '{ $w.stringValue($v) },
+      decode = r => '{ $r.readString() },
+      format = '{ BasicFormats.stringFormat },
+      schema = '{ BasicSchemas.stringSchema }
+    ),
+    unsigned = None
+  )
 
-  val All: Map[String, PrimitiveSpecification[?]] = Set(Boolean, Byte, Short, Int, Long, Float, Double)
+  val All: Map[String, PrimitiveSpecification[?]] = Set(Boolean, Byte, Short, Int, Long, Float, Double, String)
     .map(s => s.typeName -> s).toMap
 }
 

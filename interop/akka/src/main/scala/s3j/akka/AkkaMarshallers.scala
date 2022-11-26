@@ -16,13 +16,13 @@ import scala.concurrent.duration.*
 object AkkaMarshallers {
   // TODO: Stub implementations with full buffering for now, migrate to loom later:
 
-  def encodeEntity[T](data: T)(using JsonEncoder[_ >: T], ExecutionContext, Materializer): Future[RequestEntity] =
-    Future.successful {
-      val builder = ByteString.newBuilder
-      val writer = new StreamJsonWriter(new OutputStreamWriter(builder.asOutputStream, StandardCharsets.UTF_8))
-      implicitly[JsonEncoder[_ >: T]].encode(writer, data)
-      HttpEntity(ContentTypes.`application/json`, builder.result())
-    }
+  def encodeEntity[T](data: T, indent: Int = 0)(using JsonEncoder[_ >: T], ExecutionContext, Materializer): RequestEntity = {
+    val builder = ByteString.newBuilder
+    val writer = new StreamJsonWriter(new OutputStreamWriter(builder.asOutputStream, StandardCharsets.UTF_8), indent)
+    implicitly[JsonEncoder[_ >: T]].encode(writer, data)
+    writer.close()
+    HttpEntity(ContentTypes.`application/json`, builder.result())
+  }
 
   def decodeEntity[T](entity: HttpEntity)(using JsonDecoder[_ <: T], ExecutionContext, Materializer): Future[T] =
     entity.toStrict(10 second span)
@@ -35,7 +35,8 @@ object AkkaMarshallers {
 
   given toEntityMarshaller[T](using JsonEncoder[_ >: T], Materializer): ToEntityMarshaller[T] =
     Marshaller { implicit ec => data =>
-      encodeEntity(data).map(ent => Marshalling.WithFixedContentType(ContentTypes.`application/json`, () => ent) :: Nil)
+      val ret = Marshalling.WithFixedContentType(ContentTypes.`application/json`, () => encodeEntity(data)) :: Nil
+      Future.successful(ret)
     }
 
   given fromRequestUnmarshaller[T](using JsonDecoder[_ <: T], Materializer): FromRequestUnmarshaller[T] =
