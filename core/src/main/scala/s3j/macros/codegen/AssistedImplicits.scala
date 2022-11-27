@@ -2,7 +2,7 @@ package s3j.macros.codegen
 
 import dotty.tools.dotc.ast.Trees.{Tree, Untyped}
 import dotty.tools.dotc.ast.{Trees, tpd, untpd}
-import dotty.tools.dotc.core.Contexts.Context
+import dotty.tools.dotc.core.Contexts.{Context, inContext}
 import dotty.tools.dotc.core.Symbols.Symbol
 import dotty.tools.dotc.core.{StdNames, Symbols, Types}
 import dotty.tools.dotc.printing.RefinedPrinter
@@ -54,7 +54,7 @@ object AssistedImplicits {
    */
   def search(using q: Quotes)(target: q.reflect.TypeRepr, searchLocations: Set[q.reflect.Symbol],
                               assistedHelper: Option[q.reflect.Symbol]): SearchResult = {
-    val qi: q.type & QuotesImpl = q.asInstanceOf[QuotesImpl & q.type]
+    val qi: QuotesImpl & q.type = q.asInstanceOf[QuotesImpl & q.type]
 
     import qi.ctx
     val assistedMethods = assistedHelper
@@ -63,24 +63,20 @@ object AssistedImplicits {
       .map(_.symbol)
 
     def searchInner(extraLocations: Iterable[Symbol]): tpd.Tree = {
-      val implicits = new ContextualImplicits(
-        (searchLocations.map(_.asInstanceOf[Symbol]) ++ extraLocations)
-          .flatMap { sym =>
-            new ImportInfo(
-              Symbols.newImportSymbol(qi.ctx.owner, tpd.Ident(sym.namedType), Spans.NoCoord),
-              List(untpd.ImportSelector(untpd.Ident(StdNames.nme.EMPTY))),
-              untpd.EmptyTree,
-              isRootImport = false
-            ).importedImplicits
-          }
-          .toList,
-        qi.ctx.implicits,
-        isImport = false
-      )(qi.ctx)
+      val imports: Set[ImportInfo] = (searchLocations.map(_.asInstanceOf[Symbol]) ++ extraLocations)
+        .map { sym =>
+          new ImportInfo(
+            Symbols.newImportSymbol(qi.ctx.owner, tpd.Ident(sym.namedType), Spans.NoCoord),
+            List(untpd.ImportSelector(untpd.Ident(StdNames.nme.EMPTY))),
+            untpd.EmptyTree,
+            isRootImport = false
+          )
+        }
 
-      val subContext = qi.ctx.fresh.setImplicits(implicits)
-      subContext.typer.inferImplicitArg(target.asInstanceOf[Types.Type],
-        qi.reflect.Position.ofMacroExpansion.span)(using subContext)
+      inContext(imports.foldLeft(qi.ctx)(_.fresh.setImportInfo(_))) {
+        val pos = qi.reflect.Position.ofMacroExpansion.span
+        ctx.typer.inferImplicitArg(target.asInstanceOf[Types.Type], pos)
+      }
     }
 
     @tailrec
