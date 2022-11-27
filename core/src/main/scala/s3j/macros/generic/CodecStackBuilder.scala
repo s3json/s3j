@@ -14,13 +14,19 @@ import dotty.tools.dotc.core.Decorators.*
 private[generic] class CodecStackBuilder(using q: Quotes) {
   private val qi: QuotesImpl with q.type = q.asInstanceOf[q.type & QuotesImpl]
   import qi.ctx
-  import qi.reflect.{*, given}
+  import q.reflect.*
+
+  extension (s: Symbols.Symbol) {
+    private def sym: q.reflect.Symbol = s.asInstanceOf[q.reflect.Symbol]
+  }
 
   private abstract class StackEntry {
     def name: String
-    def symbol: Option[Symbol]
+    def symbol: Option[Symbols.Symbol]
     def definition: Option[Term]
     def staticType: Type[?]
+
+    def quoteSymbol: Symbol = symbol.get.sym
 
     // Reference analysis state:
 
@@ -67,17 +73,17 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
         given Type[U] = valueTpe.asType.asInstanceOf[Type[U]]
 
         initializeSymbol[U]
-        definition = Some(value.asTerm.changeOwner(symbol.get))
+        definition = Some(value.asTerm.changeOwner(quoteSymbol))
       }
 
       def nestedQuotes: Quotes = {
         initializeSymbol[T]
-        symbol.get.asQuotes
+        quoteSymbol.asQuotes
       }
 
       def reference: Expr[T] = {
         initializeSymbol[T]
-        Ref(symbol.get).asExprOf[T]
+        Ref(quoteSymbol).asExprOf[T]
       }
 
       override def toString: String = s"StackHandle[${Type.show[T]}]($name)"
@@ -94,7 +100,8 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
 
       initialized = true
       usedNames.add(name)
-      symbol = Some(Symbols.newSymbol(classSymbol, finalName.toTermName, DFlags.Final, TypeRepr.of[X]))
+      symbol = Some(Symbols.newSymbol(classSymbol, finalName.toTermName, DFlags.Final,
+        TypeRepr.of[X].asInstanceOf[Types.Type]))
     }
   }
 
@@ -115,7 +122,7 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
 
   private def matchReference(expr: Term): Option[StackEntry] =
     expr.tpe match {
-      case tr: TermRef => symbolEntries.get(tr.symbol)
+      case tr: TermRef => symbolEntries.get(expr.symbol)
       case _ => None
     }
 
@@ -125,7 +132,7 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
         matchReference(tree) match {
           case Some(e) =>
             e.rootReachable = true
-            Select(Ref(result), e.symbol.get)
+            Select(Ref(result), e.quoteSymbol)
 
           case None => super.transformTerm(tree)(owner)
         }
@@ -139,7 +146,7 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
       val tt = new TreeTraverser {
         override def traverseTree(tree: Tree)(owner: Symbol): Unit = tree match {
           case dd: DefDef if eager => traverse(ownerEntry, eager = false, dd)
-          case _ => matchReference(tree) match {
+          case tree: Term => matchReference(tree) match {
             case Some(target) =>
               if (eager) ownerEntry.eagerDeps += target
               else ownerEntry.lateDeps += target
@@ -147,10 +154,12 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
 
             case None => super.traverseTree(tree)(owner)
           }
+
+          case _ => super.traverseTree(tree)(owner)
         }
       }
 
-      tt.traverseTree(tree)(ownerEntry.symbol.get)
+      tt.traverseTree(tree)(ownerEntry.quoteSymbol)
     }
 
     for (e <- entries) {
@@ -222,10 +231,10 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
     }
 
     // All symbols are guaranteed to be set now.
-    symbolEntries = entries.map(e => e.symbol.get -> e).toMap
+    symbolEntries = entries.map(e => e.quoteSymbol -> e).toMap
 
-    val result = Symbols.newSymbol(Symbol.spliceOwner, "stack".toTermName, DFlags.EmptyFlags, classSymbol.typeRef)
-    val transformedExpr = transformRootExpression(result, expr.asTerm).asExprOf[X]
+    val result = Symbols.newSymbol(ctx.owner, "stack".toTermName, DFlags.EmptyFlags, classSymbol.typeRef)
+    val transformedExpr = transformRootExpression(result.sym, expr.asTerm).asExprOf[X]
 
     if (!entries.exists(_.rootReachable)) {
       // expr does not refer to any stack entry (i.e. everything has got inlined): just return it as-is
@@ -253,18 +262,21 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
 
     for (e <- entries.toVector.sortBy(_.eagerOrder) if e.reachable) {
       classSymbol.enter(e.symbol.get)
-      classBody += ValDef(e.symbol.get, e.definition)
+      classBody += ValDef(e.quoteSymbol, e.definition)
     }
 
     val untpdCtr = untpd.DefDef(nme.CONSTRUCTOR, Nil, tpd.TypeTree(Symbols.defn.UnitClass.typeRef), tpd.EmptyTree)
     val classDef = tpd.ClassDefWithParents(classSymbol,
       ctx.typeAssigner.assignType(untpdCtr, classSymbol.primaryConstructor),
-      List( TypeTree.of[AnyRef] ), classBody.result().toList)
+      List( TypeTree.of[AnyRef].asInstanceOf[tpd.Tree] ), classBody.result().map(_.asInstanceOf[tpd.Tree]).toList)
 
     Block(
       List(
-        classDef,
-        ValDef(result, Some(Apply(Select(New(TypeIdent(classSymbol)), classSymbol.primaryConstructor), Nil)))
+        classDef.asInstanceOf[Statement],
+        ValDef(
+          result.sym,
+          Some(Apply(Select(New(TypeIdent(classSymbol.sym)), classSymbol.primaryConstructor.sym), Nil))
+        )
       ),
       transformedExpr.asTerm
     ).asExprOf[X]
