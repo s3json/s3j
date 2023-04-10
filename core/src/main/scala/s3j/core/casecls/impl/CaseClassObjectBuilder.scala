@@ -1,7 +1,7 @@
 package s3j.core.casecls.impl
 
 import s3j.core.casecls.CaseClassContext.*
-import s3j.core.casecls.{CaseClassContext, CaseClassExtension}
+import s3j.core.casecls.{CaseClassContext, CaseClassExtension, CaseClassUtils}
 import s3j.core.casecls.impl.CaseClassObjectBuilder.{FieldIdentity, ObjectIdentity, StackEntry}
 import s3j.core.casecls.modifiers.{FieldCaseModifier, FieldKeyModifier, KeyPrefixModifier, UnknownKeysModifier}
 import s3j.io.{JsonReader, JsonWriter}
@@ -320,21 +320,8 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
             CodeUtils.joinBlocks(c.code.map(_.decodeFinal()))
 
           def decodeResult()(using Quotes): Expr[Any] = {
-            import quotes.reflect.*
-            var resultType: TypeTree = TypeIdent(typeSymbol.asInstanceOf[Symbol])
-
-            if (typeParams.nonEmpty) {
-              resultType = Applied(resultType, typeArgs.map(t => Inferred(t.asInstanceOf[TypeRepr])))
-            }
-
-            var result: Term = Select(New(resultType), typeSymbol.primaryConstructor.asInstanceOf[Symbol])
-            if (typeParams.nonEmpty) {
-              result = TypeApply(result, typeArgs.map(t => Inferred(t.asInstanceOf[TypeRepr])))
-            }
-
-            groupFields(outer.fields.zip(c.code))(_._1.listIndex, _._2.decodeResult())
-              .foldLeft(result)((t, args) => Apply(t, args.map(_.asTerm)))
-              .asExpr
+            given Type[R] = stack.head.t.asInstanceOf[Type[R]]
+            CaseClassUtils.createInstance[R](c.code.map(_.decodeResult()), typeArgs.map(_.asType))
           }
         }
 
