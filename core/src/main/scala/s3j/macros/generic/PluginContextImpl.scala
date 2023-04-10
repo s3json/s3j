@@ -36,14 +36,21 @@ extends FreshPluginContext with ModifierParserImpl with GenerationContextImpl wi
 
   val report: ErrorReporting = ErrorReporting.fromQuotes
 
-  def loadPlugin(className: String): Unit = {
+  private def loadPlugin(className: String, existingInstance: Option[Plugin]): Unit = {
     if (_plugins.contains(className)) {
+      if (existingInstance.isDefined) {
+        throw new IllegalArgumentException(s"Plugin $className is already defined in this context")
+      }
+
       return
     }
 
-    val instance: Plugin =
-      try Class.forName(className).getConstructor().newInstance().asInstanceOf[Plugin]
-      catch { case NonFatal(e) => ReportingUtils.reportException(s"Failed to load plugin $className", e) }
+    val instance: Plugin = existingInstance match {
+      case Some(inst) => inst
+      case None =>
+        try Class.forName(className).getConstructor().newInstance().asInstanceOf[Plugin]
+        catch { case NonFatal(e) => ReportingUtils.reportException(s"Failed to load plugin $className", e) }
+    }
 
     val container = new PluginContainer(className, instance)
     if (container.supportedModifiers.exists(_modifiers.contains)) {
@@ -70,8 +77,9 @@ extends FreshPluginContext with ModifierParserImpl with GenerationContextImpl wi
     }
   }
 
-  def loadPlugin[T <: Plugin]()(using qn: QualifiedName[T]): Unit =
-    loadPlugin(qn.name)
+  def loadPlugin(className: String): Unit = loadPlugin(className, None)
+  def loadPlugin[T <: Plugin]()(using qn: QualifiedName[T]): Unit = loadPlugin(qn.name, None)
+  def usePlugin(plugin: Plugin): Unit = loadPlugin(plugin.getClass.getName, Some(plugin))
 
   def plugins: Set[Plugin] = _pluginInstances
 

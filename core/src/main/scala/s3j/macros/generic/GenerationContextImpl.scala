@@ -162,7 +162,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
         case _ => None
       }
 
-    export outer.{extensions, loadPlugin, plugins, symbolModifiers}
+    export outer.{extensions, loadPlugin, plugins, symbolModifiers, usePlugin}
 
     def identity: AnyRef =
       try candidate.get.identity

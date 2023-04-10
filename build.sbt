@@ -1,10 +1,10 @@
 ThisBuild / organization := "io.s3j"
 ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := "3.2.0"
+ThisBuild / scalaVersion := "3.2.2"
 
 val commonSettings = Seq(
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.2.14" % Test
+    "org.scalatest" %% "scalatest" % "3.2.15" % Test
   ),
 
   Compile / scalacOptions ++= Seq("-Xcheck-macros"),
@@ -59,6 +59,7 @@ lazy val core = (project in file("core"))
     )
   )
 
+// noinspection SbtDependencyVersionInspection
 lazy val `interop-akka` = (project in file("interop/akka"))
   .dependsOn(runtime)
   .settings(commonSettings)
@@ -79,9 +80,9 @@ lazy val `interop-jooq` = (project in file("interop/jooq"))
     name := "s3j-jooq",
 
     libraryDependencies ++= Seq(
-      "org.jooq" % "jooq" % "3.17.4",
-      "org.testcontainers" % "postgresql" % "1.17.5" % Test,
-      "org.postgresql" % "postgresql" % "42.5.0" % Test
+      "org.jooq" % "jooq" % "3.18.0",
+      "org.testcontainers" % "postgresql" % "1.17.6" % Test,
+      "org.postgresql" % "postgresql" % "42.5.4" % Test
     )
   )
 

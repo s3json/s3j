@@ -22,7 +22,10 @@ trait BasicPluginContext {
 
   /** Load plugin by it's type */
   def loadPlugin[T <: Plugin]()(using QualifiedName[T]): Unit
-
+  
+  /** Use already instantiated plugin */
+  def usePlugin(plugin: Plugin): Unit
+  
   /** @return List of currently loaded plugins */
   def plugins: Set[Plugin]
 

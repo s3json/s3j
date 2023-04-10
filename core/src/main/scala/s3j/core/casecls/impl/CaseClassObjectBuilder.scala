@@ -113,7 +113,7 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
   private class FieldContextImpl(val f: FieldImpl, val ext: ExtensionRegistration[CaseClassExtension])
   extends CaseClassContext {
     // TODO: Wrap 'nested' with added generation path
-    export c.{generationMode, symbolModifiers, loadPlugin, plugins, extensions, nested}
+    export c.{generationMode, symbolModifiers, loadPlugin, plugins, extensions, nested, usePlugin}
 
     val report: ErrorReporting = c.reportBuilder
       .usePlugin(ext.pluginClass)
