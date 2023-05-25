@@ -310,7 +310,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
 
       val subTask = task.nestedTask(StackEntry(
         target = target.asInstanceOf[outer.q.reflect.TypeRepr],
-        modifiers = task.modifiers,
+        modifiers = task.modifiers ++ symbolModifiers(target.typeSymbol).own,
         path = Nil,
         label = None,
         mode = subMode

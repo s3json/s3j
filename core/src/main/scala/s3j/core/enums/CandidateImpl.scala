@@ -17,8 +17,14 @@ import s3j.macros.traits.GenerationResult
 import scala.annotation.threadUnsafe
 import scala.quoted.{Expr, Quotes, Type, quotes}
 
+private[enums] object CandidateImpl {
+  private case class EnumCaseIdentity(discriminator: String)
+  private case class EnumIdentity(behavior: Behavior, cases: Set[EnumCaseIdentity])
+}
+
 private[enums] class CandidateImpl[T](modifiers: ModifierSet)(using q: Quotes, c: GenerationContext, t: Type[T])
 extends GenerationCandidate {
+  import CandidateImpl.*
   import q.reflect.*
 
   private case class EnumCase(sym: Symbol, mods: ModifierSet, ordinal: Int, singleton: Boolean, discriminator: String) {
@@ -47,9 +53,6 @@ extends GenerationCandidate {
         }
       } else nested.decode(reader)
   }
-
-  private case class EnumCaseIdentity(discriminator: String)
-  private case class EnumIdentity(behavior: Behavior, cases: Set[EnumCaseIdentity])
 
   private val typeSymbol: Symbol = TypeRepr.of[T].typeSymbol
   private val behavior: Behavior = modifiers.get(EnumObjectModifier).fold(Behavior.Default)(_.behavior)

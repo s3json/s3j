@@ -126,10 +126,25 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl =>
     def toNestedResult[T](using Type[T]): GenerationResult[T] = new GenerationResultImpl[T](this)
   }
 
+  protected given typeIdentityConv: Conversion[TypeRepr, TypeIdentity] = new TypeIdentity(_)
+
+  // TypeRepr's should be compared with "=:=", not with "=="
+  protected final class TypeIdentity(val x: TypeRepr) {
+    private[this] val _hash: Int = Type.show(using x.asType).hashCode
+
+    override def equals(obj: Any): Boolean = obj match {
+      case t: TypeIdentity => x =:= t.x
+      case _ => false
+    }
+
+    override def hashCode: Int = _hash
+    override def toString: String = Type.show(using x.asType)
+  }
+
   protected sealed trait CachingKey
-  protected case class BasicCachingKey(target: TypeRepr, modifiers: ModifierSet) extends CachingKey
-  protected case class ImplicitCachingKey(target: TypeRepr) extends CachingKey
-  protected case class PluginCachingKey(target: TypeRepr, plugin: String, identity: AnyRef) extends CachingKey
+  protected case class BasicCachingKey(target: TypeIdentity, modifiers: ModifierSet) extends CachingKey
+  protected case class ImplicitCachingKey(target: TypeIdentity) extends CachingKey
+  protected case class PluginCachingKey(target: TypeIdentity, plugin: String, identity: AnyRef) extends CachingKey
 
   protected val _serializers: mutable.Map[CachingKey, SerializerHandle] = mutable.HashMap.empty
   protected var _serializerSet: mutable.Set[SerializerHandle] = mutable.HashSet.empty

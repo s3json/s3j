@@ -12,10 +12,14 @@ import s3j.schema.{BasicSchemas, JsonSchema}
 
 import scala.quoted.{Expr, Quotes, Type, quotes}
 
-class PrimitivesPlugin extends Plugin {
-  def name: String = "Primitives plugin"
-
+private[primitives] object PrimitivesPlugin {
   private case class PrimitiveIdentity(unsigned: Boolean)
+}
+
+class PrimitivesPlugin extends Plugin {
+  import PrimitivesPlugin.*
+
+  def name: String = "Primitives plugin"
 
   private class CandidateImpl[T](spec: PrimitiveSpecification[T], modifiers: ModifierSet)
                                 (using tt: Type[T], ctx: GenerationContext)

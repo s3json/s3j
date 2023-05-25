@@ -230,31 +230,6 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
         .toSet
     )
 
-  // Restore previously flattened field list to List[List[X]]
-  private def groupFields[T, R](fields: Seq[T])(listIndex: T => Int, result: T => R): List[List[R]] = {
-    val r = List.newBuilder[List[R]]
-    var rr = List.newBuilder[R]
-    var lastIndex = 0
-
-    for (f <- fields) {
-      val idx = listIndex(f)
-      if (idx < lastIndex || idx > lastIndex + 1) {
-        throw new IllegalArgumentException("listIndex is not monotonic: " + fields.map(listIndex).mkString(", "))
-      }
-
-      if (idx > lastIndex) {
-        r += rr.result()
-        rr = List.newBuilder[R]
-      }
-
-      rr += result(f)
-      lastIndex = idx
-    }
-
-    r += rr.result()
-    r.result()
-  }
-
   private def augmentSchema[T](f: FieldImpl, s: SchemaExpr[T]): SchemaExpr[T] =
     SchemaExpr.augmentModifiers(s, f.inheritedModifiers)
 

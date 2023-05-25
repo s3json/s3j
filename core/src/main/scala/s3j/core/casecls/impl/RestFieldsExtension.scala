@@ -13,8 +13,12 @@ import s3j.macros.schema.SchemaExpr
 
 import scala.quoted.{Expr, Quotes, Type, quotes}
 
-class RestFieldsExtension extends CaseClassExtension {
+private[casecls] object RestFieldsExtension {
   private case object RestFieldsIdentity
+}
+
+class RestFieldsExtension extends CaseClassExtension {
+  import RestFieldsExtension.*
 
   private class ObjectFieldImpl[T](using CaseClassContext, Quotes, Type[T]) extends ObjectField[T] {
     def identity: AnyRef = RestFieldsIdentity

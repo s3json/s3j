@@ -11,10 +11,13 @@ import s3j.macros.traits.GenerationResult
 import scala.annotation.threadUnsafe
 import scala.quoted.{Expr, Quotes, Type}
 
+private[casecls] object PlainFieldExtension {
+  private case object PlainFieldIdentity
+}
+
 /** Extension which always generates single field with nested serializer */
 private[casecls] class PlainFieldExtension extends CaseClassExtension {
-  private case object PlainFieldIdentity
-
+  import PlainFieldExtension.*
   private class ObjectFieldImpl[T](field: FieldRequest[T])(using q: Quotes, c: CaseClassContext, t: Type[T])
   extends ObjectField[T] {
     val identity: AnyRef = PlainFieldIdentity

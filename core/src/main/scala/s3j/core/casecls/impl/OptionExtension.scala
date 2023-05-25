@@ -12,8 +12,12 @@ import s3j.macros.traits.GenerationResult
 
 import scala.quoted.*
 
-class OptionExtension extends CaseClassExtension {
+private[casecls] object OptionExtension {
   private case class OptionIdentity(nullOption: Boolean)
+}
+
+class OptionExtension extends CaseClassExtension {
+  import OptionExtension.*
 
   private class ObjectFieldImpl[T](using c: CaseClassContext)(field: FieldRequest[Option[T]])
                                   (using Quotes, Type[T])

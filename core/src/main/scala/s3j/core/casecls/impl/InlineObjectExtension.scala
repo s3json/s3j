@@ -10,8 +10,12 @@ import s3j.macros.schema.SchemaExpr
 
 import scala.quoted.{Expr, Quotes, Type}
 
-private[casecls] class InlineObjectExtension extends CaseClassExtension {
+private[casecls] object InlineObjectExtension {
   private case object InlineObjectIdentity
+}
+
+private[casecls] class InlineObjectExtension extends CaseClassExtension {
+  import InlineObjectExtension.*
 
   private class ObjectFieldImpl[T](field: FieldRequest[T])(using q: Quotes, c: CaseClassContext, t: Type[T])
   extends ObjectField[T] {
