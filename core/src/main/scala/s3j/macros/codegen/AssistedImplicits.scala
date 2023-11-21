@@ -106,7 +106,7 @@ object AssistedImplicits {
               })
 
               // Reuse Hole class in a bit of unusual way:
-              tpd.Hole(false, idx, Nil, tpd.EmptyTree, typeTree)
+              tpd.Hole(false, idx, Nil, tpd.EmptyTree, tree.tpe)
             }
           }
         }.transform(tree)
@@ -133,7 +133,7 @@ object AssistedImplicits {
             import dotty.tools.dotc.core.Decorators.show
             treeWithHoles
               .toText(new RefinedPrinter(qi.ctx) {
-                override def toTextCore[T >: Untyped](tree: Tree[T]): Text = tree match {
+                override def toTextCore[T <: Untyped](tree: Tree[T]): Text = tree match {
                   case h: Trees.Hole[_] => literalText(s"hole${h.idx}")
                   case _ => super.toTextCore(tree)
                 }

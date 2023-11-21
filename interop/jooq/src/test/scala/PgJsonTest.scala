@@ -5,8 +5,8 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import s3j.ast.JsValue
 import s3j.jooq.PgBinaryJsonBinding
+import s3j.JsonFormat
 import s3j.*
-import s3j.io.AstJsonWriter
 
 import java.sql.DriverManager
 import scala.jdk.CollectionConverters.*
@@ -20,6 +20,9 @@ class PgJsonTest extends AnyFlatSpec with Matchers {
   private val testTable = new TestTable
 
   case class Test(x: Int, y: Boolean) derives JsonFormat
+
+  // For some reason this does not happen automatically:
+  Class.forName("org.testcontainers.jdbc.ContainerDatabaseDriver")
 
   it should "work for JSON with PostgreSQL" in {
     val conn = DriverManager.getConnection("jdbc:tc:postgresql:13.0:///testdb")

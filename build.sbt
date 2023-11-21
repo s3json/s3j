@@ -1,13 +1,13 @@
 ThisBuild / organization := "io.s3j"
 ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := "3.2.2"
+ThisBuild / scalaVersion := "3.3.1"
 
 val commonSettings = Seq(
   libraryDependencies ++= Seq(
     "org.scalatest" %% "scalatest" % "3.2.15" % Test
   ),
 
-  Compile / scalacOptions ++= Seq("-Xcheck-macros"),
+  Compile / scalacOptions ++= Seq("-Xcheck-macros", "-Yno-decode-stacktraces"),
 )
 
 val notPublished = Seq(
@@ -49,7 +49,7 @@ lazy val schema = (project in file("schema"))
   )
 
 lazy val core = (project in file("core"))
-  .dependsOn(runtime, schema % Provided)
+  .dependsOn(runtime, schema)
   .settings(commonSettings)
   .settings(
     name := "s3j",
@@ -80,9 +80,9 @@ lazy val `interop-jooq` = (project in file("interop/jooq"))
     name := "s3j-jooq",
 
     libraryDependencies ++= Seq(
-      "org.jooq" % "jooq" % "3.18.0",
-      "org.testcontainers" % "postgresql" % "1.17.6" % Test,
-      "org.postgresql" % "postgresql" % "42.5.4" % Test
+      "org.jooq"            % "jooq"        % "3.18.0",
+      "org.testcontainers"  % "postgresql"  % "1.19.2" % Test,
+      "org.postgresql"      % "postgresql"  % "42.5.4" % Test
     )
   )
 

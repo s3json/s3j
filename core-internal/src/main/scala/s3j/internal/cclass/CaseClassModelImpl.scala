@@ -29,8 +29,8 @@ extends CaseClassModel[T] {
       case _ => ""
     }
 
-  private class CaseField(val ctorSymbol: Symbol) {
-    type R
+  private class CaseField[R](val ctorSymbol: Symbol) {
+    type RR = R
 
     val fieldSymbol: Symbol = typeSymbol.fieldMember(ctorSymbol.name)
     val key: String = fieldSymbol.name
@@ -51,20 +51,21 @@ extends CaseClassModel[T] {
     override def toString: String = s"CaseField(sym=${fieldSymbol.name}, tpe=${tpe.show}, fieldType=$fieldType)"
   }
 
-  private class RegularField(val f: CaseField) extends CaseClassModel[f.R] {
+  private class RegularField[R](val f: CaseField[R]) extends CaseClassModel[R] {
+    import f.rTypeGiven
     val keys: Set[String] = Set(f.key)
     val dynamicKeys: Boolean = false
 
-    val nested: NestedFormat[f.R] = NestedFormat.lookup(mode)
+    val nested: NestedFormat[R] = NestedFormat.lookup(mode)
 
-    def encode(writer: Expr[JsonWriter], value: Expr[f.R])(using Quotes): Expr[Any] = '{
+    def encode(writer: Expr[JsonWriter], value: Expr[R])(using Quotes): Expr[Any] = '{
       $writer.key(${ Expr(f.key) })
       ${nested.encoder}.encode($writer, $value)
     }
 
-    def decode(reader: Expr[JsonReader])(using Quotes, DecodingEnv): CaseClassModel.DecoderCode[f.R] =
-      new CaseClassModel.DecoderCode[f.R] {
-        private val result: Variable[f.R] = Variable.create(f.ctorSymbol.name)
+    def decode(reader: Expr[JsonReader])(using Quotes, DecodingEnv): CaseClassModel.DecoderCode[R] =
+      new CaseClassModel.DecoderCode[R] {
+        private val result: Variable[R] = Variable.create(f.ctorSymbol.name)
         def variables: Seq[Variable[_]] = Seq(result)
 
         def staticKey(key: String)(using Quotes): Expr[Any] =
@@ -78,26 +79,27 @@ extends CaseClassModel[T] {
           '{ if (!$present) ObjectFormatUtils.throwMissingKey($reader, ${ Expr(f.key) }) }
         }
 
-        def result()(using Quotes): Expr[f.R] = result.value
+        def result()(using Quotes): Expr[R] = result.value
       }
   }
 
-  private class OptionalField(val f: CaseField) extends CaseClassModel[f.R] {
+  private class OptionalField[R](val f: CaseField[R]) extends CaseClassModel[R] {
     type T
-    given tType: Type[T] = TypeRepr.of[f.R].typeArgs.head.asType.asInstanceOf[Type[T]]
+    import f.rTypeGiven
+    given tType: Type[T] = TypeRepr.of[R].typeArgs.head.asType.asInstanceOf[Type[T]]
 
     val nested: NestedFormat[T] = NestedFormat.lookup(mode)
 
     val keys: Set[String] = Set(f.key)
     val dynamicKeys: Boolean = false
 
-    def encode(writer: Expr[JsonWriter], value: Expr[f.R])(using Quotes): Expr[Any] = {
+    def encode(writer: Expr[JsonWriter], value: Expr[R])(using Quotes): Expr[Any] = {
       val valueOpt = value.asExprOf[Option[T]]
       '{ if ($valueOpt.isDefined) { $writer.key(${ Expr(f.key) }); ${nested.encoder}.encode($writer, $valueOpt.get) } }
     }
 
-    def decode(reader: Expr[JsonReader])(using Quotes, DecodingEnv): CaseClassModel.DecoderCode[f.R] =
-      new CaseClassModel.DecoderCode[f.R] {
+    def decode(reader: Expr[JsonReader])(using Quotes, DecodingEnv): CaseClassModel.DecoderCode[R] =
+      new CaseClassModel.DecoderCode[R] {
         private val result: Variable[Option[T]] = Variable.create(f.ctorSymbol.name)('{ None })
 
         def variables: Seq[Variable[_]] = Seq(result)
@@ -109,19 +111,20 @@ extends CaseClassModel[T] {
           throw new UnsupportedOperationException("OptionalField.dynamicKey")
 
         def finalCode()(using Quotes): Expr[Any] = '{}
-        def result()(using Quotes): Expr[f.R] = result.value.asExprOf[f.R]
+        def result()(using Quotes): Expr[R] = result.value.asExprOf[R]
       }
   }
 
-  private class RestFieldsField(val f: CaseField) extends CaseClassModel[f.R] {
+  private class RestFieldsField[R](val f: CaseField[R]) extends CaseClassModel[R] {
+    import f.rTypeGiven
     val keys: Set[String] = Set.empty
     val dynamicKeys: Boolean = true
 
-    def encode(writer: Expr[JsonWriter], value: Expr[f.R])(using Quotes): Expr[Any] =
+    def encode(writer: Expr[JsonWriter], value: Expr[R])(using Quotes): Expr[Any] =
       '{ ObjectFormatUtils.writeRestFields($writer, ${ value.asExprOf[JsObject] }) }
 
-    def decode(reader: Expr[JsonReader])(using Quotes, DecodingEnv): CaseClassModel.DecoderCode[f.R] =
-      new CaseClassModel.DecoderCode[f.R] {
+    def decode(reader: Expr[JsonReader])(using Quotes, DecodingEnv): CaseClassModel.DecoderCode[R] =
+      new CaseClassModel.DecoderCode[R] {
         private val result: Variable[RestFieldsBuilder] = Variable.create(f.ctorSymbol.name)('{ new RestFieldsBuilder })
 
         def variables: Seq[Variable[_]] = Seq(result)
@@ -133,16 +136,16 @@ extends CaseClassModel[T] {
           '{ ${result.value}.readField($key.toString, $reader) }
 
         def finalCode()(using Quotes): Expr[Any] = '{}
-        def result()(using Quotes): Expr[f.R] = '{ ${result.value}.result() }.asExprOf[f.R]
+        def result()(using Quotes): Expr[R] = '{ ${result.value}.result() }.asExprOf[R]
       }
   }
 
-  private val fields: Seq[CaseField] = typeSymbol.primaryConstructor.paramSymss.head.map(s => new CaseField(s))
+  private val fields: Seq[CaseField[?]] = typeSymbol.primaryConstructor.paramSymss.head.map(s => new CaseField(s))
   private val fieldModels: Seq[CaseClassModel[?]] = fields.map { f =>
     f.fieldType match {
       case FieldType.Regular    => new RegularField(f)
       case FieldType.Optional   => new OptionalField(f)
-      case FieldType.Inline     => new CaseClassModelImpl[f.R](mode)
+      case FieldType.Inline     => new CaseClassModelImpl[f.RR](mode)(using quotes, f.rTypeGiven)
       case FieldType.RestFields => new RestFieldsField(f)
     }
   }
