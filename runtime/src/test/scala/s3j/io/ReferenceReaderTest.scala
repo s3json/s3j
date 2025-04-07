@@ -54,4 +54,7 @@ class ReferenceReaderTest extends AnyFlatSpec with Matchers {
   test("{\n}\n")
   test("{\n\"x\":true\n}\n")
   test("{\n\t\"x\":123,\n\t\"y\":true,\n\t\"z\":\"qweqwe\"\n}\n")
+
+  // at least 2x continuation tokens
+  test("{\"x\":\"" + "loooongstring".repeat(2048) + "\"}")
 }

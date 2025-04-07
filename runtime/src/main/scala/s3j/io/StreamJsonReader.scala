@@ -61,13 +61,19 @@ class StreamJsonReader(in: Reader, settings: ReaderSettings = StreamJsonReader.d
       JsonToken.TNumber
 
     case LTStringContinued =>
-      savedState = state
-      state = SDataChunk
+      if (state != SDataChunk) {
+        savedState = state
+        state = SDataChunk
+      }
+
       JsonToken.TStringContinued
 
     case LTNumberContinued =>
-      savedState = state
-      state = SDataChunk
+      if (state != SDataChunk) {
+        savedState = state
+        state = SDataChunk
+      }
+
       JsonToken.TNumberContinued
 
     case other => unexpectedToken(other, "any value")
