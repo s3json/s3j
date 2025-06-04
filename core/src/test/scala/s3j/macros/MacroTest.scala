@@ -279,4 +279,30 @@ class MacroTest extends AnyFlatSpec with Matchers {
     Test(TestA(12, 23), TestA(45, 56)).toJsonString shouldBe """{"ax":12,"ay":23,"bx":45,"by":56}"""
     """{"ax":12,"ay":23,"bx":45,"by":56}""".fromJson[Test] shouldBe Test(TestA(12, 23), TestA(45, 56))
   }
+
+  it should "serialize Options inside of the @inlineObject's" in {
+    case class TestA(x: Option[Int])
+    case class Test(@inlineObject x: TestA) derives JsonFormat
+
+    Test(TestA(None)).toJsonString shouldBe "{}"
+    Test(TestA(Some(123))).toJsonString shouldBe """{"x":123}"""
+
+    "{}".fromJson[Test] shouldBe Test(TestA(None))
+    "{\"x\":null}".fromJson[Test] shouldBe Test(TestA(None))
+    "{\"x\":123}".fromJson[Test] shouldBe Test(TestA(Some(123)))
+  }
+
+  it should "serialize Options inside of enums with @inlineObject payloads" in {
+    case class TestA(x: Option[Int])
+    enum Test derives JsonFormat {
+      case A(@inlineObject msg: TestA)
+    }
+
+    Test.A(TestA(None)).toJsonString shouldBe "{\"type\":\"A\"}"
+    Test.A(TestA(Some(123))).toJsonString shouldBe "{\"type\":\"A\",\"x\":123}"
+
+    "{\"type\":\"A\"}".fromJson[Test] shouldBe Test.A(TestA(None))
+    "{\"type\":\"A\",\"x\":null}".fromJson[Test] shouldBe Test.A(TestA(None))
+    "{\"type\":\"A\",\"x\":123}".fromJson[Test] shouldBe Test.A(TestA(Some(123)))
+  }
 }
