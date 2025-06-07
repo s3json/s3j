@@ -60,8 +60,9 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
 
   private class FieldImpl(val ctorField: Symbol, val listIndex: Int) {
     val classField: Symbol = typeSymbol.fieldMember(ctorField.name)
-    val fieldType: TypeRepr = generatedType.memberType(ctorField).substituteTypes(typeParams, typeArgs).simplified.dealias
-    val ownModifiers: ModifierSet = c.symbolModifiers(ctorField).own
+    val rawFieldType: TypeRepr = generatedType.memberType(ctorField).substituteTypes(typeParams, typeArgs)
+    val fieldType: TypeRepr = rawFieldType.simplified.dealias
+    val ownModifiers: ModifierSet = c.symbolModifiers(ctorField).own ++ c.typeModifiers(rawFieldType, ctorField.pos)
     val inheritedModifiers: ModifierSet = ModifierSet.inherit(outer.modifiers, ownModifiers)
 
     /**
@@ -113,7 +114,7 @@ private[casecls] class CaseClassObjectBuilder[R](stack: List[StackEntry])(using 
   private class FieldContextImpl(val f: FieldImpl, val ext: ExtensionRegistration[CaseClassExtension])
   extends CaseClassContext {
     // TODO: Wrap 'nested' with added generation path
-    export c.{generationMode, symbolModifiers, loadPlugin, plugins, extensions, nested, usePlugin}
+    export c.{generationMode, symbolModifiers, typeModifiers, loadPlugin, plugins, extensions, nested, usePlugin}
 
     val report: ErrorReporting = c.reportBuilder
       .usePlugin(ext.pluginClass)

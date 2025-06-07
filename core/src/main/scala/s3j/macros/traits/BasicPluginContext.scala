@@ -3,6 +3,7 @@ package s3j.macros.traits
 import s3j.macros.Plugin
 import s3j.macros.PluginContext.{ExtensionRegistration, SymbolModifiers}
 import s3j.macros.generic.{Extensions, GenerationMode}
+import s3j.macros.modifiers.ModifierSet
 import s3j.macros.utils.QualifiedName
 
 import scala.quoted.Quotes
@@ -15,6 +16,9 @@ trait BasicPluginContext {
   /** @return Parsed modifier set for a symbol */
   def symbolModifiers(using q: Quotes)(sym: q.reflect.Symbol): SymbolModifiers
 
+  /** @return Parsed modifier set for a type */
+  def typeModifiers(using q: Quotes)(tpe: q.reflect.TypeRepr, pos: Option[q.reflect.Position]): ModifierSet
+  
   // Plugin management: ================================================================================================
 
   /** Load plugin with specified class name */

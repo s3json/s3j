@@ -7,7 +7,7 @@ import scala.collection.mutable
 import s3j.macros.modifiers.{Modifier, ModifierContext, ModifierKey, ModifierSet}
 import s3j.macros.utils.{MacroUtils, QualifiedName, ReportingUtils}
 
-import scala.annotation.{Annotation, targetName}
+import scala.annotation.{Annotation, tailrec, targetName}
 import scala.quoted.{Expr, Quotes, Type}
 import scala.quoted.runtime.StopMacroExpansion
 import scala.util.control.NonFatal
@@ -142,6 +142,50 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl =
   def symbolModifiers(using q: Quotes)(sym: q.reflect.Symbol): SymbolModifiers =
     symbolModifiers0(sym.asInstanceOf[Symbol])
 
+  def typeModifiers(using q: Quotes)(tpe: q.reflect.TypeRepr, pos: Option[q.reflect.Position]): ModifierSet =
+    typeModifiers0(tpe.asInstanceOf[TypeRepr], pos.asInstanceOf[Option[Position]])
+
+  private def processAnnotations(
+    annotationTrees: Seq[Term],
+    context: ModifierContext,
+    objectPos: Option[Position],
+    objectRepr: => String
+  ): Seq[Modifier] = {
+    val annotations: Set[AnnotationData] =
+      annotationTrees.map(parseAnnotation).filterNot(processMetaAnnotation).toSet
+
+    for (a <- annotations if !_seenAnnotations.contains(a.fullName)) {
+      for (ma <- a.symbol.annotations) processMetaAnnotation(parseAnnotation(ma))
+      _seenAnnotations.add(a.fullName)
+    }
+
+    val (parsed, unparsed) = annotations.partition(a => _modifiers.contains(a.fullName))
+    _unparsedAnnotations.addAll(unparsed.map(_.fullName))
+
+    parsed
+      .map { ann =>
+        val handler = _modifiers(ann.fullName)
+        val modifier: Modifier =
+          try handler.modifierParser(ann.toModifier(context))
+          catch { case NonFatal(e) => ReportingUtils.reportException(s"Plugin ${handler.className} failed to parse " +
+            s"annotation $ann", e, Some(ann.pos)) }
+
+        (ann, modifier)
+      }
+      .groupMap(_._2.key)(identity)
+      .collect {
+        case (_, vs) if vs.size == 1 => vs.head._2
+        case (k, vs) =>
+          val sb = new mutable.StringBuilder()
+          sb ++= objectRepr ++= " has conflicting annotations for modifier '" ++= k.toString ++= "':\n\n"
+
+          for (v <- vs) sb ++= " - " ++= v._1.toString ++= "\n"
+
+          ReportingUtils.reportError(sb.result(), objectPos)
+      }
+      .toVector
+  }
+
   protected def symbolModifiers0(startSymbol: Symbol): SymbolModifiers = {
     var parents: List[Symbol] = startSymbol :: Nil
 
@@ -158,44 +202,12 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl =
       val parentModifiers: Option[ModifierData] =
         Some(sym.maybeOwner).filter(_ != Symbol.noSymbol).map(_modifierCache)
 
-      val annotations: Set[AnnotationData] =
-        sym.annotations.map(parseAnnotation).filterNot(processMetaAnnotation).toSet
-
-      for (a <- annotations if !_seenAnnotations.contains(a.fullName)) {
-        for (ma <- a.symbol.annotations) processMetaAnnotation(parseAnnotation(ma))
-        _seenAnnotations.add(a.fullName)
-      }
-
-      val (parsed, unparsed) = annotations.partition(a => _modifiers.contains(a.fullName))
-      _unparsedAnnotations.addAll(unparsed.map(_.fullName))
-
       val context: ModifierContext = // TODO
         if (sym.flags.is(Flags.Enum)) ModifierContext.Enum
         else if (sym.isClassDef && sym.flags.is(Flags.Trait) && sym.flags.is(Flags.Sealed)) ModifierContext.Enum
         else ModifierContext.Generic
 
-      val modifiers: Seq[Modifier] = parsed
-        .map { ann =>
-          val handler = _modifiers(ann.fullName)
-          val modifier: Modifier =
-            try handler.modifierParser(ann.toModifier(context))
-            catch { case NonFatal(e) => ReportingUtils.reportException(s"Plugin ${handler.className} failed to parse " +
-              s"annotation $ann", e, Some(ann.pos)) }
-
-          (ann, modifier)
-        }
-        .groupMap(_._2.key)(identity)
-        .collect {
-          case (_, vs) if vs.size == 1 => vs.head._2
-          case (k, vs) =>
-            val sb = new mutable.StringBuilder()
-            sb ++= sym.toString ++= " has conflicting annotations for modifier '" ++= k.toString ++= "':\n\n"
-
-            for (v <- vs) sb ++= " - " ++= v._1.toString ++= "\n"
-
-            ReportingUtils.reportError(sb.result(), sym.pos)
-        }
-        .toVector
+      val modifiers = processAnnotations(sym.annotations, context, sym.pos, sym.toString)
 
       val own = ModifierSet(modifiers:_*)
       val inherited = ModifierSet.inherit(parentModifiers.fold(_rootModifiers)(_.inherited), own)
@@ -206,5 +218,32 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl =
     }
 
     _modifierCache(startSymbol)
+  }
+
+  private def typeModifiers0(tpe: TypeRepr, pos: Option[Position]): ModifierSet = {
+    val r = Vector.newBuilder[Modifier]
+
+    @tailrec
+    def inner(tpe: TypeRepr): Unit =
+      tpe match {
+        case AnnotatedType(tpe, annot) =>
+          r ++= processAnnotations(List(annot), ModifierContext.Generic, pos, tpe.show)
+          inner(tpe)
+
+        case _ => // skip
+      }
+
+    inner(dealiasKeepAnnots(tpe))
+    ModifierSet(r.result()*)
+  }
+
+  private def dealiasKeepAnnots(tpe: TypeRepr): TypeRepr = {
+    import scala.quoted.runtime.impl.QuotesImpl
+    val qi: q.type & QuotesImpl = q.asInstanceOf[q.type & QuotesImpl]
+    import qi.ctx
+    tpe
+      .asInstanceOf[qi.reflect.TypeRepr]
+      .dealiasKeepAnnots
+      .asInstanceOf[q.reflect.TypeRepr]
   }
 }

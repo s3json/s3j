@@ -3,10 +3,12 @@ package s3j.macros
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import s3j.annotations.*
-import s3j.annotations.naming.{capitalizedKebabCase, screamingSnakeCase, snakeCase}
+import s3j.annotations.naming.{camelCase, capitalizedKebabCase, screamingSnakeCase, snakeCase}
 import s3j.ast.JsObject
 import s3j.io.ParseException
 import s3j.{*, given}
+
+import java.util
 
 class MacroTest extends AnyFlatSpec with Matchers {
   it should "serialize simple classes" in {
@@ -304,5 +306,39 @@ class MacroTest extends AnyFlatSpec with Matchers {
     "{\"type\":\"A\"}".fromJson[Test] shouldBe Test.A(TestA(None))
     "{\"type\":\"A\",\"x\":null}".fromJson[Test] shouldBe Test.A(TestA(None))
     "{\"type\":\"A\",\"x\":123}".fromJson[Test] shouldBe Test.A(TestA(Some(123)))
+  }
+
+  it should "recognize type annotations in case classes" in {
+    case class Test(x: Int @jsonUnsigned, y: Array[Byte] @hexUpper) derives JsonFormat
+
+    val obj = Test(-1, Array(-1, 1))
+    val str = "{\"x\":4294967295,\"y\":\"FF01\"}"
+
+    obj.toJsonString shouldBe str
+    str.fromJson[Test] shouldBe obj
+  }
+
+  it should "recognize aliased type annotations" in {
+    type UnsignedInt = Int @jsonUnsigned
+    case class Test(x: UnsignedInt) derives JsonFormat
+
+    val obj = Test(-1)
+    val str = "{\"x\":4294967295}"
+
+    obj.toJsonString shouldBe str
+    str.fromJson[Test] shouldBe obj
+  }
+
+  it should "recognize type annotations in enums" in {
+    @camelCase
+    enum Test derives JsonFormat {
+      case A(x: Int @jsonUnsigned)
+    }
+
+    val obj1 = Test.A(-1)
+    val str1 = "{\"type\":\"a\",\"x\":4294967295}"
+
+    obj1.toJsonString shouldBe str1
+    str1.fromJson[Test] shouldBe obj1
   }
 }
