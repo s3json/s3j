@@ -2,19 +2,18 @@ package s3j.macros.generic
 
 import s3j.macros.FreshPluginContext.StackHandle
 import s3j.macros.PluginContext.ExtensionRegistration
+import s3j.macros.codegen.CodecStackBuilder
 import s3j.macros.{FreshPluginContext, Plugin, PluginCapability, PluginContext}
 import s3j.macros.modifiers.{Modifier, ModifierParser}
 import s3j.macros.traits.ErrorReporting
 import s3j.macros.utils.{MacroUtils, QualifiedName, ReportingUtils}
 
 import scala.collection.mutable
-import scala.quoted.runtime.impl.QuotesImpl
 import scala.quoted.{Expr, Quotes, Type}
 import scala.util.control.NonFatal
 
 private[macros] class PluginContextImpl(using val q: Quotes)
 extends FreshPluginContext with ModifierParserImpl with GenerationContextImpl with GenerationStateImpl {
-  protected val qi: QuotesImpl & q.type = q.asInstanceOf[QuotesImpl & q.type]
   import q.reflect.*
 
   protected class PluginContainer(val className: String, val instance: Plugin) {

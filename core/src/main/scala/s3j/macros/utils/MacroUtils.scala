@@ -1,8 +1,9 @@
 package s3j.macros.utils
 
+import s3j.internal.macros.ForbiddenMacroUtils
+
 import java.io.{PrintWriter, StringWriter}
 import scala.collection.mutable
-import scala.quoted.runtime.impl.QuotesImpl
 import scala.quoted.{Expr, Quotes, Type}
 
 private[macros] object MacroUtils {
@@ -26,10 +27,8 @@ private[macros] object MacroUtils {
    * @param q Quotes instance
    * @return List of macro settings filtered by `s3j:` prefix
    */
-  def macroSettings(using q: Quotes): Seq[String] = {
-    val ctx = q.asInstanceOf[QuotesImpl].ctx
-    ctx.settings.XmacroSettings.valueIn(ctx.settingsState)
-  }
+  def macroSettings(using q: Quotes): Seq[String] =
+    ForbiddenMacroUtils.instance.macroSettings
 
   /** @return Macro settings, filtered by given prefix (and with that prefix removed) */
   def macroSettings(prefix: String)(using Quotes): Seq[String] =

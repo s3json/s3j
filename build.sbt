@@ -1,6 +1,6 @@
 ThisBuild / organization := "io.s3j"
 ThisBuild / version := "0.1.0-SNAPSHOT"
-ThisBuild / scalaVersion := "3.3.1"
+ThisBuild / scalaVersion := "3.3.6"
 
 val commonSettings = Seq(
   libraryDependencies ++= Seq(
@@ -35,10 +35,6 @@ lazy val `core-internal` = (project in file("core-internal"))
   .settings(commonSettings, notPublished)
   .settings(
     name := "s3j-core-internal",
-
-    libraryDependencies ++= Seq(
-      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value % Provided
-    )
   )
 
 lazy val schema = (project in file("schema"))
@@ -55,7 +51,7 @@ lazy val core = (project in file("core"))
     name := "s3j",
 
     libraryDependencies ++= Seq(
-      "org.scala-lang" %% "scala3-compiler" % scalaVersion.value % Provided
+      "io.s3j" %% "s3j-macro-helpers" % "0.2.1",
     )
   )
 
@@ -91,7 +87,7 @@ lazy val `interop-sbt` = (project in file("interop/sbt-plugin"))
   .settings(
     name := "s3j-sbt",
 
-    scalaVersion := "2.12.16",
+    scalaVersion := "2.12.20",
     crossScalaVersions := Seq(scalaVersion.value),
 
     buildInfoKeys := Seq(organization, version),

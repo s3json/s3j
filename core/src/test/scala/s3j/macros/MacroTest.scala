@@ -315,7 +315,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     val str = "{\"x\":4294967295,\"y\":\"FF01\"}"
 
     obj.toJsonString shouldBe str
-    str.fromJson[Test] shouldBe obj
+    str.fromJson[Test].toJsonString shouldBe str
   }
 
   it should "recognize aliased type annotations" in {
@@ -333,6 +333,7 @@ class MacroTest extends AnyFlatSpec with Matchers {
     @camelCase
     enum Test derives JsonFormat {
       case A(x: Int @jsonUnsigned)
+      case B(x: Array[Byte] @hexUpper)
     }
 
     val obj1 = Test.A(-1)
@@ -340,5 +341,11 @@ class MacroTest extends AnyFlatSpec with Matchers {
 
     obj1.toJsonString shouldBe str1
     str1.fromJson[Test] shouldBe obj1
+
+    val obj2 = Test.B(Array(-1, 1))
+    val str2 = "{\"type\":\"b\",\"x\":\"FF01\"}"
+
+    obj2.toJsonString shouldBe str2
+    str2.fromJson[Test].toJsonString shouldBe str2
   }
 }

@@ -1,12 +1,12 @@
 package s3j.macros.generic
 
+import s3j.internal.macros.ForbiddenMacroUtils
 import s3j.macros.PluginContext.SymbolModifiers
 import s3j.macros.modifiers.ModifierParser.{AnnotationModifier, TextModifier}
-
-import scala.collection.mutable
 import s3j.macros.modifiers.{Modifier, ModifierContext, ModifierKey, ModifierSet}
 import s3j.macros.utils.{MacroUtils, QualifiedName, ReportingUtils}
 
+import scala.collection.mutable
 import scala.annotation.{Annotation, tailrec, targetName}
 import scala.quoted.{Expr, Quotes, Type}
 import scala.quoted.runtime.StopMacroExpansion
@@ -233,17 +233,7 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl =
         case _ => // skip
       }
 
-    inner(dealiasKeepAnnots(tpe))
+    inner(ForbiddenMacroUtils.instance.dealiasKeepAnnots(tpe))
     ModifierSet(r.result()*)
-  }
-
-  private def dealiasKeepAnnots(tpe: TypeRepr): TypeRepr = {
-    import scala.quoted.runtime.impl.QuotesImpl
-    val qi: q.type & QuotesImpl = q.asInstanceOf[q.type & QuotesImpl]
-    import qi.ctx
-    tpe
-      .asInstanceOf[qi.reflect.TypeRepr]
-      .dealiasKeepAnnots
-      .asInstanceOf[q.reflect.TypeRepr]
   }
 }

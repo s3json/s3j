@@ -66,6 +66,7 @@ object GenerationMode {
 
   /** Decoder-only generation mode */
   case object Decoder extends GenerationMode {
+    def name: String = "Decoder"
     def generateEncoders: Boolean = false
     def generateDecoders: Boolean = true
     def stringy: Boolean = false
@@ -77,6 +78,7 @@ object GenerationMode {
   }
 
   case object StringDecoder extends GenerationMode {
+    def name: String = "StringDecoder"
     def generateEncoders: Boolean = false
     def generateDecoders: Boolean = true
     def stringy: Boolean = true
@@ -89,6 +91,7 @@ object GenerationMode {
 
   /** Encoder-only generation mode */
   case object Encoder extends GenerationMode {
+    def name: String = "Encoder"
     def generateEncoders: Boolean = true
     def generateDecoders: Boolean = false
     def stringy: Boolean = false
@@ -100,6 +103,7 @@ object GenerationMode {
   }
 
   case object StringEncoder extends GenerationMode {
+    def name: String = "StringEncoder"
     def generateEncoders: Boolean = true
     def generateDecoders: Boolean = false
     def stringy: Boolean = true
@@ -112,6 +116,7 @@ object GenerationMode {
 
   /** Decoder-and-encoder (format) generation mode */
   case object Format extends GenerationMode {
+    def name: String = "Format"
     def generateEncoders: Boolean = true
     def generateDecoders: Boolean = true
     def stringy: Boolean = false
@@ -124,6 +129,7 @@ object GenerationMode {
 
   /** Decoder-and-encoder (format) generation mode */
   case object StringFormat extends GenerationMode {
+    def name: String = "StringFormat"
     def generateEncoders: Boolean = true
     def generateDecoders: Boolean = true
     def stringy: Boolean = true
@@ -136,6 +142,7 @@ object GenerationMode {
 
   /** Schema generation mode */
   case object Schema extends GenerationMode {
+    def name: String = "Schema"
     def generateEncoders: Boolean = false
     def generateDecoders: Boolean = false
     def stringy: Boolean = false
@@ -148,6 +155,9 @@ object GenerationMode {
 }
 
 sealed trait GenerationMode {
+  /** Generation mode constant name */
+  def name: String
+  
   /** @return Whether we should generate encoders in this mode or not */
   def generateEncoders: Boolean
 

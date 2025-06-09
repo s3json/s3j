@@ -10,10 +10,6 @@ import java.lang.reflect.InvocationTargetException
 import scala.annotation.threadUnsafe
 import scala.collection.mutable
 import scala.quoted.{Expr, Quotes, Type}
-import dotty.tools.dotc.ast.{Trees, tpd, untpd}
-import dotty.tools.dotc.core.{Symbols, Types, Flags as DFlags}
-import dotty.tools.dotc.core.StdNames.nme
-import dotty.tools.dotc.core.Decorators.*
 import s3j.io.{JsonReader, JsonWriter}
 import s3j.macros.FreshPluginContext.StackHandle
 import s3j.schema.JsonSchema
@@ -90,7 +86,7 @@ private[macros] trait GenerationStateImpl { this: PluginContextImpl =>
   //    precise cache hits
 
   protected class SerializerHandle(val mode: GenerationMode, val targetType: TypeRepr, val identity: AnyRef) {
-    type A // Applied
+    type A // Applied: JsonSomething[T]
     type T // Target
 
     given typeApplied: Type[A] = mode.appliedType(targetType).asType.asInstanceOf[Type[A]]

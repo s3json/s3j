@@ -1,32 +1,23 @@
-package s3j.macros.generic
+package s3j.macros.codegen
 
+import s3j.internal.macros.ClassGenerator
+import s3j.internal.macros.ClassGenerator.FieldHandle
 import s3j.macros.FreshPluginContext.StackHandle
 
 import scala.collection.mutable
-import scala.quoted.{Quotes, Type, Expr}
-import scala.quoted.runtime.impl.QuotesImpl
+import scala.quoted.{Expr, Quotes, Type}
 
-import dotty.tools.dotc.ast.{Trees, tpd, untpd}
-import dotty.tools.dotc.core.{Symbols, Types, Flags as DFlags}
-import dotty.tools.dotc.core.StdNames.nme
-import dotty.tools.dotc.core.Decorators.*
-
-private[generic] class CodecStackBuilder(using q: Quotes) {
-  private val qi: QuotesImpl with q.type = q.asInstanceOf[q.type & QuotesImpl]
-  import qi.ctx
+private[macros] class CodecStackBuilder(using q: Quotes) {
   import q.reflect.*
-
-  extension (s: Symbols.Symbol) {
-    private def sym: q.reflect.Symbol = s.asInstanceOf[q.reflect.Symbol]
-  }
 
   private abstract class StackEntry {
     def name: String
-    def symbol: Option[Symbols.Symbol]
+    def field: Option[FieldHandle[?]]
     def definition: Option[Term]
     def staticType: Type[?]
-
-    def quoteSymbol: Symbol = symbol.get.sym
+    def externalReference: Expr[?]
+    def symbol: Symbol
+    def ensureField: FieldHandle[?]
 
     // Reference analysis state:
 
@@ -55,8 +46,7 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
 
   private class TypedStackEntry[T](val name: String, val index: Int)(using val staticType: Type[T])
   extends StackEntry { outer =>
-    var initialized:  Boolean = false
-    var symbol:       Option[Symbols.Symbol] = None
+    var field:        Option[FieldHandle[T]] = None
     var definition:   Option[Term] = None
 
     val handle: StackHandle[T] = new StackHandle[T] {
@@ -72,43 +62,39 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
         type U <: T
         given Type[U] = valueTpe.asType.asInstanceOf[Type[U]]
 
-        initializeSymbol[U]
-        definition = Some(value.asTerm.changeOwner(quoteSymbol))
+        val f = ensureFieldT[U]
+        f.setInitializer(value)
+        definition = Some(value.asTerm.changeOwner(f.symbol))
       }
 
-      def nestedQuotes: Quotes = {
-        initializeSymbol[T]
-        quoteSymbol.asQuotes
-      }
-
-      def reference: Expr[T] = {
-        initializeSymbol[T]
-        Ref(quoteSymbol).asExprOf[T]
-      }
+      def nestedQuotes: Quotes = ensureFieldT[T].nestedQuotes
+      def reference: Expr[T] = ensureFieldT[T].reference
 
       override def toString: String = s"StackHandle[${Type.show[T]}]($name)"
     }
 
-    def initializeSymbol[X](using tpe: Type[X]): Unit = {
-      if (initialized) {
-        return
+    def externalReference: Expr[T] = ensureField.externalReference
+    def symbol: Symbol = ensureField.symbol
+
+    def ensureField: FieldHandle[T] = ensureFieldT[T]
+
+    private def ensureFieldT[U <: T](using Type[U]): FieldHandle[T] =
+      field.getOrElse {
+        val finalName =
+          if (usedNames.contains(name)) name + "_" + index
+          else name
+
+        usedNames.add(name)
+
+        val result = classGen.defineField[U](finalName).asInstanceOf[FieldHandle[T]]
+        field = Some(result)
+        result
       }
-
-      val finalName =
-        if (usedNames.contains(name)) name + "_" + index
-        else name
-
-      initialized = true
-      usedNames.add(name)
-      symbol = Some(Symbols.newSymbol(classSymbol, finalName.toTermName, DFlags.Final,
-        TypeRepr.of[X].asInstanceOf[Types.Type]))
-    }
   }
 
   private val entries: mutable.ArrayBuffer[StackEntry] = mutable.ArrayBuffer.empty
   private val usedNames: mutable.Set[String] = mutable.HashSet.empty
-  private val classSymbol: Symbols.ClassSymbol = Symbols.newNormalizedClassSymbol(qi.ctx.owner, "$wrapper".toTypeName,
-    DFlags.Final, List(Symbols.defn.ObjectType), Types.NoType, Symbols.NoSymbol)
+  private val classGen: ClassGenerator = ClassGenerator("$wrapper")
 
   private var nextIndex = 0
   private var symbolEntries: Map[Symbol, StackEntry] = _
@@ -126,13 +112,13 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
       case _ => None
     }
 
-  private def transformRootExpression(result: Symbol, expr: Term): Term = {
+  private def transformRootExpression(expr: Term): Term = {
     val treeMap = new TreeMap {
       override def transformTerm(tree: Term)(owner: Symbol): Term =
         matchReference(tree) match {
           case Some(e) =>
             e.rootReachable = true
-            Select(Ref(result), e.quoteSymbol)
+            e.externalReference.asTerm
 
           case None => super.transformTerm(tree)(owner)
         }
@@ -159,7 +145,7 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
         }
       }
 
-      tt.traverseTree(tree)(ownerEntry.quoteSymbol)
+      tt.traverseTree(tree)(ownerEntry.symbol)
     }
 
     for (e <- entries) {
@@ -206,6 +192,7 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
         changed = true
         e.eagerComplete = true
         e.eagerOrder = nextOrder
+        e.ensureField.setPosition(e.eagerOrder)
         nextOrder += 1
       }
     }
@@ -231,11 +218,9 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
     }
 
     // All symbols are guaranteed to be set now.
-    symbolEntries = entries.map(e => e.quoteSymbol -> e).toMap
+    symbolEntries = entries.map(e => e.symbol -> e).toMap
 
-    val result = Symbols.newSymbol(ctx.owner, "stack".toTermName, DFlags.EmptyFlags, classSymbol.typeRef)
-    val transformedExpr = transformRootExpression(result.sym, expr.asTerm).asExprOf[X]
-
+    val transformedExpr = transformRootExpression(expr.asTerm).asExprOf[X]
     if (!entries.exists(_.rootReachable)) {
       // expr does not refer to any stack entry (i.e. everything has got inlined): just return it as-is
       return expr
@@ -257,28 +242,6 @@ private[generic] class CodecStackBuilder(using q: Quotes) {
       return entries.find(_.reachable).get.definition.get.asExprOf[X]
     }
 
-    val classBody = Vector.newBuilder[Statement]
-    classSymbol.enter(Symbols.newConstructor(classSymbol, DFlags.Synthetic, Nil, Nil))
-
-    for (e <- entries.toVector.sortBy(_.eagerOrder) if e.reachable) {
-      classSymbol.enter(e.symbol.get)
-      classBody += ValDef(e.quoteSymbol, e.definition)
-    }
-
-    val untpdCtr = untpd.DefDef(nme.CONSTRUCTOR, Nil, tpd.TypeTree(Symbols.defn.UnitClass.typeRef), tpd.EmptyTree)
-    val classDef = tpd.ClassDefWithParents(classSymbol,
-      ctx.typeAssigner.assignType(untpdCtr, classSymbol.primaryConstructor),
-      List( TypeTree.of[AnyRef].asInstanceOf[tpd.Tree] ), classBody.result().map(_.asInstanceOf[tpd.Tree]).toList)
-
-    Block(
-      List(
-        classDef.asInstanceOf[Statement],
-        ValDef(
-          result.sym,
-          Some(Apply(Select(New(TypeIdent(classSymbol.sym)), classSymbol.primaryConstructor.sym), Nil))
-        )
-      ),
-      transformedExpr.asTerm
-    ).asExprOf[X]
+    classGen.build(transformedExpr)
   }
 }

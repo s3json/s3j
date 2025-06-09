@@ -8,7 +8,6 @@ import s3j.macros.modifiers.{ModifierParser, ModifierSet}
 import s3j.macros.schema.SchemaExpr
 import s3j.macros.{CodecExpr, GenerationContext, Plugin, PluginContext}
 
-import scala.quoted.runtime.impl.TypeImpl
 import scala.quoted.{Expr, Quotes, Type, quotes}
 
 class BinaryPlugin extends Plugin {

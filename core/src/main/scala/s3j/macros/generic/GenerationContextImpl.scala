@@ -1,13 +1,15 @@
 package s3j.macros.generic
 
-import s3j.format.{JsonDecoder, JsonEncoder}
+import s3j.format.{JsonDecoder, JsonEncoder, JsonFormat, StringyDecoder, StringyEncoder, StringyFormat}
+import s3j.internal.macros.ForbiddenMacroUtils
 import s3j.macros.GenerationContext.{GenerationCandidate, GenerationOutcome, GenerationRejection}
+import s3j.macros.codegen.AssistedImplicits.{SearchResult, SearchSuccess, SearchFailure}
 import s3j.macros.codegen.{AssistedImplicits, Position as XPosition}
 import s3j.macros.{CodecExpr, GenerationContext, PluginCapability, PluginContext}
 import s3j.macros.modifiers.{BuiltinModifiers, ModifierSet}
 import s3j.macros.schema.SchemaExpr
 import s3j.macros.traits.{ErrorReporting, GenerationResult, NestedBuilder, ReportingBuilder}
-import s3j.macros.utils.{ForbiddenMacroUtils, GenerationPath, MacroUtils, ReportingUtils}
+import s3j.macros.utils.{GenerationPath, MacroUtils, ReportingUtils}
 import s3j.schema.JsonSchema
 
 import java.io.{PrintWriter, StringWriter}
@@ -15,7 +17,6 @@ import scala.util.control.NonFatal
 import scala.collection.mutable
 import scala.quoted.{Expr, Quotes, Type}
 import scala.quoted.runtime.StopMacroExpansion
-import scala.quoted.runtime.impl.QuotesImpl
 
 private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
   import q.reflect.*
@@ -267,7 +268,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
     }
 
     val h = createHandle(task, key, key.identity)
-    ForbiddenMacroUtils.clearQuotesCache()
+    ForbiddenMacroUtils.instance.clearQuotesCache()
 
     if (h.mode.schema) {
       val expr = context.doGeneration(_.generateSchema(using h.nestedQuotes)())
@@ -280,28 +281,18 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
     h
   }
 
-  private def searchImplicits(entry: StackEntry, behaviors: Set[ImplicitBehavior]): AssistedImplicits.SearchResult = {
-    val assistedHelper = entry.mode match {
-      case GenerationMode.Decoder | GenerationMode.StringDecoder =>
-        Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Decoder")
-
-      case GenerationMode.Encoder | GenerationMode.StringEncoder =>
-        Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Encoder")
-
-      case GenerationMode.Format | GenerationMode.StringFormat =>
-        Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Format")
-
-      case GenerationMode.Schema =>
-        Symbol.requiredModule("s3j.macros.codegen.AssistedHelpers.Schema")
-    }
-
+  private def searchImplicits(entry: StackEntry, behaviors: Set[ImplicitBehavior]): SearchResult = {
     val t = entry.mode.appliedType(entry.target)
-    AssistedImplicits.search(t, behaviors.flatMap(_.extraLocations), Some(assistedHelper))
+
+    AssistedImplicits(
+      entry.mode, t, Position.ofMacroExpansion,
+      behaviors.flatMap(_.extraLocations).toList
+    ).result
   }
 
-  private def generateImplicit(task: GenerationTask, r: AssistedImplicits.SearchSuccess)(using q: Quotes): Expr[Any] = {
+  private def generateImplicit(task: GenerationTask, r: SearchSuccess)(using q: Quotes): Expr[Any] = {
     import q.reflect.*
-    val holes = r.holes.map { tpe =>
+    val holes = r.missingTypes.map { tpe =>
       val (subMode, target) = GenerationMode.decodeRaw(TypeRepr.of(using tpe))
       if (!task.mode.modeCompatible(subMode)) {
         throw new RuntimeException("Implicit hole has an incompatible generation mode: mode=" + task.mode +
@@ -319,7 +310,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
       generate(subTask).reference
     }
 
-    r.expr(holes)
+    r.result(holes)
   }
 
   def generate[T](mode: GenerationMode, modifiers: ModifierSet)(using Type[T]): GenerationResult[T] = {
@@ -358,7 +349,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
     }
 
     searchImplicits(task.stack.head, implicitBehaviors.map(_._1)) match {
-      case success: AssistedImplicits.SearchSuccess =>
+      case success: SearchSuccess =>
         val h = createHandle(task, task.implicitKey, ImplicitIdentity)
         val expr = generateImplicit(task, success)(using h.nestedQuotes)
 
@@ -370,7 +361,7 @@ private[macros] trait GenerationContextImpl { outer: PluginContextImpl =>
 
         h
 
-      case AssistedImplicits.SearchFailure(explanation) =>
+      case SearchFailure(explanation) =>
         if (task.modifiers.contains(BuiltinModifiers.RequireImplicit)) {
           report.errorAndAbort(formatMessage("@requireImplicit is present and no implicit candidate was found:\n\n" +
             explanation, task, plugin = None))
