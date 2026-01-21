@@ -1,19 +1,19 @@
-package s3j.akka
+package s3j.pekko
 
-import akka.http.scaladsl.marshalling.{Marshaller, Marshalling, ToEntityMarshaller, ToResponseMarshaller}
-import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, RequestEntity}
-import akka.http.scaladsl.unmarshalling.{FromRequestUnmarshaller, Unmarshaller}
-import akka.stream.Materializer
-import akka.util.ByteString
+import org.apache.pekko.http.scaladsl.marshalling.{Marshaller, Marshalling, ToEntityMarshaller}
+import org.apache.pekko.http.scaladsl.model.{ContentTypes, HttpEntity, RequestEntity}
+import org.apache.pekko.http.scaladsl.unmarshalling.{FromRequestUnmarshaller, Unmarshaller}
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.util.ByteString
 import s3j.format.{JsonDecoder, JsonEncoder}
 import s3j.io.{StreamJsonReader, StreamJsonWriter}
 
-import java.io.{ByteArrayOutputStream, InputStreamReader, OutputStreamWriter}
+import java.io.{InputStreamReader, OutputStreamWriter}
 import java.nio.charset.StandardCharsets
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
+import scala.concurrent.{ExecutionContext, Future}
 
-object AkkaMarshallers {
+object PekkoMarshallers {
   // TODO: Stub implementations with full buffering for now, migrate to loom later:
 
   def encodeEntity[T](data: T, indent: Int = 0)(using JsonEncoder[_ >: T], ExecutionContext, Materializer): RequestEntity = {

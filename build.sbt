@@ -18,7 +18,7 @@ val notPublished = Seq(
 )
 
 lazy val root = (project in file("."))
-  .aggregate(runtime, schema, core, `interop-akka`, `interop-jooq`, `interop-sbt`)
+  .aggregate(runtime, schema, core, `interop-pekko`, `interop-jooq`, `interop-sbt`)
   .settings(notPublished)
   .settings(
     name := "s3j-root"
@@ -56,17 +56,16 @@ lazy val core = (project in file("core"))
   )
 
 // noinspection SbtDependencyVersionInspection
-lazy val `interop-akka` = (project in file("interop/akka"))
+lazy val `interop-pekko` = (project in file("interop/pekko"))
   .dependsOn(runtime)
   .settings(commonSettings)
   .settings(
-    name := "s3j-akka",
+    name := "s3j-pekko",
 
     libraryDependencies ++= Seq(
-      // Apache 2 licensed versions:
-      "com.typesafe.akka" %% "akka-stream" % "2.6.20",
-      "com.typesafe.akka" %% "akka-http" % "10.2.10"
-    ).map(_.cross(CrossVersion.for3Use2_13))
+      "org.apache.pekko" %% "pekko-stream" % "1.4.0",
+      "org.apache.pekko" %% "pekko-http"   % "1.3.0"
+    )
   )
 
 lazy val `interop-jooq` = (project in file("interop/jooq"))
