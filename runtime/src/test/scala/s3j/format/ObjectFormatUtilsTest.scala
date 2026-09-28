@@ -27,16 +27,19 @@ class ObjectFormatUtilsTest extends AnyFlatSpec with Matchers {
   it should "decode discriminator from buffered reader" in {
     val reader = new AstJsonReader(parse("""{"type":"A","x":1}"""))
     decodeDiscriminated(reader) shouldBe ("A" -> JsObject("x" -> 1))
+    reader.nextToken() shouldBe JsonToken.TEndOfStream
   }
 
   it should "decode out-of-order discriminator from buffered reader without buffering flag" in {
     val reader = new AstJsonReader(parse("""{"x":1,"type":"A","y":true}"""))
     decodeDiscriminated(reader) shouldBe ("A" -> JsObject("x" -> 1, "y" -> true))
+    reader.nextToken() shouldBe JsonToken.TEndOfStream
   }
 
   it should "decode discriminator of a singleton object from buffered reader" in {
     val reader = new AstJsonReader(parse("""{"type":"B"}"""))
     decodeDiscriminated(reader) shouldBe ("B" -> JsObject())
+    reader.nextToken() shouldBe JsonToken.TEndOfStream
   }
 
   it should "continue reading enclosing structure after buffered discriminator" in {
@@ -48,6 +51,7 @@ class ObjectFormatUtilsTest extends AnyFlatSpec with Matchers {
 
     reader.nextToken() shouldBe JsonToken.TNumber
     reader.nextToken() shouldBe JsonToken.TStructureEnd
+    reader.nextToken() shouldBe JsonToken.TEndOfStream
   }
 
   private def streamReader(json: String, config: JsonReader.ReadingConfig = JsonReader.DefaultConfig): JsonReader =

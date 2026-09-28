@@ -120,13 +120,20 @@ class AstJsonReader(
 
   /** @return Next token from the stream */
   protected def readToken(): JsonToken = {
-    if (state == null) {
-      // very first token - start state machine with root node
-      return emitValue(node)
-    }
-
     if (isCompleted) {
       return TEndOfStream
+    }
+
+    if (state == null) {
+      // very first token - start state machine with root node
+      val r = emitValue(node)
+
+      // Scalars (null and booleans) are emitted without pushing any state:
+      if (state == null) {
+        isCompleted = true
+      }
+
+      return r
     }
 
     if (state.pendingValue != null) {
@@ -197,13 +204,13 @@ class AstJsonReader(
   }
 
   def readValue(): JsValue = {
+    if (isCompleted) {
+      throw new IllegalStateException("readValue() at the end of stream")
+    }
+
     if (state == null) {
       isCompleted = true
       return node
-    }
-
-    if (isCompleted) {
-      throw new IllegalStateException("readValue() at the end of stream")
     }
 
     if (state.pendingValue != null) {
