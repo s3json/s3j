@@ -51,7 +51,7 @@ lazy val core = (project in file("core"))
     name := "s3j",
 
     libraryDependencies ++= Seq(
-      "io.s3j" %% "s3j-macro-helpers" % "0.2.1",
+      "io.s3j" %% "s3j-macro-helpers" % "0.3.0",
     )
   )
 
