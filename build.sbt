@@ -8,6 +8,9 @@ val commonSettings = Seq(
   ),
 
   Compile / scalacOptions ++= Seq("-Xcheck-macros", "-Yno-decode-stacktraces"),
+
+  // Macro-generated code must not trigger compiler bug warnings (e.g. from querying positions of synthetic symbols)
+  Test / scalacOptions += "-Wconf:msg=Missing symbol position:e",
 )
 
 val notPublished = Seq(

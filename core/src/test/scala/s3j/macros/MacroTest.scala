@@ -48,6 +48,9 @@ object MacroTest {
   }
 
   case class Holder(items: Seq[Inner], outer: Outer) derives JsonFormat
+
+  @snakeCase @camelCase
+  case class Conflicting(someField: Int)
 }
 
 class MacroTest extends AnyFlatSpec with Matchers {
@@ -122,6 +125,11 @@ class MacroTest extends AnyFlatSpec with Matchers {
 
     Test("123", "456", "789").toJsonString shouldBe "{\"mew\":\"123\",\"meow_oink\":\"456\",\"Bark-Honk\":\"789\"}"
     "{\"mew\":\"XXX\",\"meow_oink\":\"YYY\",\"Bark-Honk\":\"ZZZ\"}".fromJson[Test] shouldBe Test("XXX", "YYY", "ZZZ")
+  }
+
+  it should "reject conflicting annotations on a single symbol" in {
+    val errors: List[compiletime.testing.Error] = compiletime.testing.typeCheckErrors("JsonFormat.derived[Conflicting]")
+    errors.map(_.message).mkString should include ("has conflicting annotations for modifier 'fieldCase'")
   }
 
   it should "recognize global annotations for case convention" in {

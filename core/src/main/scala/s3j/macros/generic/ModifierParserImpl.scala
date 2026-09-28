@@ -148,7 +148,7 @@ private[macros] transparent trait ModifierParserImpl { this: PluginContextImpl =
   private def processAnnotations(
     annotationTrees: Seq[Term],
     context: ModifierContext,
-    objectPos: Option[Position],
+    objectPos: => Option[Position], // by-name: querying positions of synthetic symbols triggers compiler warnings
     objectRepr: => String
   ): Seq[Modifier] = {
     val annotations: Set[AnnotationData] =
