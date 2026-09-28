@@ -61,10 +61,17 @@ object CaseClassUtils {
         s"type ${Type.show[T]}: formal=$nParams, actual=${args.size}")
     }
 
-    val resultType: TypeTree =
-      if (typeArgs.nonEmpty) Applied(TypeIdent(tpeSym), typeArgs.map(t => Inferred(TypeRepr.of(using t))).toList)
-      else TypeIdent(tpeSym)
+    // Type constructor is taken from the requested type rather than from the symbol, preserving its prefix:
+    // symbol-based references would use `this` of the owner (e.g. `Inner.this.P`), which is invalid for
+    // path-dependent types
+    val typeConstructor: TypeRepr = tpe.dealias match {
+      case AppliedType(tycon, _) => tycon
+      case other => other
+    }
 
+    val resultType: TypeTree =
+      if (typeArgs.nonEmpty) Applied(Inferred(typeConstructor), typeArgs.map(t => Inferred(TypeRepr.of(using t))).toList)
+      else Inferred(typeConstructor)
 
     val listLengths: Array[Int] = paramLists.map(_.size).toArray
     val listOffsets: Array[Int] = new Array[Int](listLengths.length)

@@ -348,6 +348,54 @@ class MacroTest extends AnyFlatSpec with Matchers {
     an [ParseException] shouldBe thrownBy { "{}".fromJson[User] }
   }
 
+  it should "serialize local enums used as nested values" in {
+    enum Inner {
+      case P(v: Int)
+      case Q
+    }
+
+    enum Outer derives JsonFormat {
+      case W(inner: Inner)
+    }
+
+    (Outer.W(Inner.P(1)): Outer).toJsonString shouldBe "{\"type\":\"W\",\"inner\":{\"type\":\"P\",\"v\":1}}"
+    (Outer.W(Inner.Q): Outer).toJsonString shouldBe "{\"type\":\"W\",\"inner\":{\"type\":\"Q\"}}"
+
+    "{\"type\":\"W\",\"inner\":{\"type\":\"P\",\"v\":1}}".fromJson[Outer] shouldBe Outer.W(Inner.P(1))
+    "{\"type\":\"W\",\"inner\":{\"type\":\"Q\"}}".fromJson[Outer] shouldBe Outer.W(Inner.Q)
+  }
+
+  it should "serialize sealed hierarchies nested in local objects" in {
+    object Shapes {
+      sealed trait Shape
+      case class Circle(r: Int) extends Shape
+      case object Dot extends Shape
+    }
+
+    case class Drawing(shapes: Seq[Shapes.Shape]) derives JsonFormat
+
+    val d = Drawing(Seq(Shapes.Circle(2), Shapes.Dot))
+    val json = "{\"shapes\":[{\"type\":\"Circle\",\"r\":2},{\"type\":\"Dot\"}]}"
+
+    d.toJsonString shouldBe json
+    json.fromJson[Drawing] shouldBe d
+  }
+
+  it should "serialize case classes nested in local objects" in {
+    object Geo {
+      case class Point(x: Int, y: Int)
+      case class Tagged[T](value: T, tag: String)
+    }
+
+    case class Pin(at: Geo.Point, label: Geo.Tagged[Int]) derives JsonFormat
+
+    val pin = Pin(Geo.Point(1, 2), Geo.Tagged(3, "t"))
+    val json = "{\"at\":{\"x\":1,\"y\":2},\"label\":{\"value\":3,\"tag\":\"t\"}}"
+
+    pin.toJsonString shouldBe json
+    json.fromJson[Pin] shouldBe pin
+  }
+
   it should "serialize collections" in {
     case class Test(a: Int, b: Seq[Test]) derives JsonFormat
     Test(123, Seq(Test(456, Nil), Test(789, Seq(Test(0, Nil))))).toJsonString shouldBe

@@ -27,16 +27,34 @@ extends GenerationCandidate {
   import CandidateImpl.*
   import q.reflect.*
 
+  /**
+   * Stable path to the object owning a symbol, if symbol is owned by an object. Symbol references created from the
+   * symbol alone would use `this` of the owner class (e.g. `Inner.this.P`), which is invalid outside of the owner when
+   * the object is local.
+   */
+  private def ownerPath(using q: Quotes)(sym: q.reflect.Symbol): Option[q.reflect.Term] = {
+    import q.reflect.*
+    val owner = sym.maybeOwner
+    if (!owner.isClassDef || !owner.flags.is(Flags.Module)) None
+    else {
+      val module = owner.companionModule
+      Some(ownerPath(module).fold(Ref(module))(Select(_, module)))
+    }
+  }
+
   private case class EnumCase(sym: Symbol, mods: ModifierSet, ordinal: Int, singleton: Boolean, discriminator: String) {
     type C <: T
-    given caseType: Type[C] = sym.typeRef.asType.asInstanceOf[Type[C]]
+
+    val caseTypeRepr: TypeRepr = ownerPath(sym).fold(sym.typeRef)(_.tpe.select(sym))
+    given caseType: Type[C] = caseTypeRepr.asType.asInstanceOf[Type[C]]
 
     @threadUnsafe
     lazy val nested: GenerationResult[C] = c.nested[C].modifiers(mods).build()
 
     def singletonValue(using Quotes): Expr[C] = {
       import quotes.reflect.*
-      Ref(sym.asInstanceOf[Symbol]).asExprOf[C]
+      val s = sym.asInstanceOf[Symbol]
+      ownerPath(s).fold(Ref(s))(Select(_, s)).asExprOf[C]
     }
 
     def decode(reader: Expr[JsonReader])(using Quotes): Expr[C] =
@@ -103,12 +121,12 @@ extends GenerationCandidate {
       cases
         .map {
           case c if c.singleton =>
-            CaseDef(Ref(c.sym.asInstanceOf[Symbol]), None, encodeCase(c)(writer, null).asTerm)
+            CaseDef(c.singletonValue.asTerm, None, encodeCase(c)(writer, null).asTerm)
 
           case c =>
-            val caseSym = c.sym.asInstanceOf[Symbol] // cast to Symbol in this Quotes universe
-            val bindSym = Symbol.newBind(Symbol.spliceOwner, "v", Flags.EmptyFlags, caseSym.typeRef)
-            CaseDef(Bind(bindSym, Typed(Wildcard(), TypeIdent(caseSym))), None,
+            import c.caseType
+            val bindSym = Symbol.newBind(Symbol.spliceOwner, "v", Flags.EmptyFlags, TypeRepr.of[c.C])
+            CaseDef(Bind(bindSym, Typed(Wildcard(), TypeTree.of[c.C])), None,
               encodeCase(c)(writer, Ident(bindSym.termRef).asExprOf[c.C]).asTerm)
         }
         .toList
