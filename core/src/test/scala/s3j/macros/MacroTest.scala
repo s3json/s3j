@@ -4,13 +4,42 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import s3j.annotations.*
 import s3j.annotations.naming.{camelCase, capitalizedKebabCase, screamingSnakeCase, snakeCase}
-import s3j.ast.JsObject
+import s3j.ast.{JsObject, JsValue}
+import s3j.format.BasicFormats
 import s3j.io.ParseException
 import s3j.{*, given}
 
 import java.util
 
+object MacroTest {
+  // Children of sealed traits are not members of trait's companion object
+  sealed trait Animal derives JsonFormat
+  case class Cat(lives: Int) extends Animal
+  case object Fish extends Animal
+
+  enum Message derives JsonFormat {
+    case Text(body: String)
+    case Ping
+  }
+
+  object ids {
+    // Opaque types have no known representation outside of their scope
+    opaque type UserId = Long
+
+    object UserId {
+      def apply(v: Long): UserId = v
+
+      given JsonFormat[UserId] = BasicFormats.stringFormat.mapFormat(id => s"u-$id", s => s.stripPrefix("u-").toLong)
+    }
+  }
+
+  import ids.UserId
+  case class User(id: UserId, parent: Option[UserId]) derives JsonFormat
+}
+
 class MacroTest extends AnyFlatSpec with Matchers {
+  import MacroTest.*
+  import MacroTest.ids.UserId
   it should "serialize simple classes" in {
     case class Test(x: String, y: String) derives JsonFormat
     Test("123", "qwe").toJsonString shouldBe "{\"x\":\"123\",\"y\":\"qwe\"}"
@@ -238,6 +267,34 @@ class MacroTest extends AnyFlatSpec with Matchers {
 
     "{\"type\":\"TestA\",\"x\":\"X\"}".fromJson[Test] shouldBe TestA("X")
     "{\"type\":\"TestB\",\"y\":\"Y\"}".fromJson[Test] shouldBe TestB("Y")
+  }
+
+  it should "serialize case objects in sealed hierarchies" in {
+    (Cat(9): Animal).toJsonString shouldBe "{\"type\":\"Cat\",\"lives\":9}"
+    (Fish: Animal).toJsonString shouldBe "{\"type\":\"Fish\"}"
+
+    "{\"type\":\"Fish\"}".fromJson[Animal] shouldBe Fish
+    "{\"type\":\"Cat\",\"lives\":1}".fromJson[Animal] shouldBe Cat(1)
+  }
+
+  it should "decode discriminated enums from AST" in {
+    "{\"type\":\"Text\",\"body\":\"hi\"}".fromJson[JsValue].convertTo[Message] shouldBe Message.Text("hi")
+    "{\"type\":\"Ping\"}".fromJson[JsValue].convertTo[Message] shouldBe Message.Ping
+    "{\"body\":\"hi\",\"type\":\"Text\"}".fromJson[JsValue].convertTo[Message] shouldBe Message.Text("hi")
+
+    "[{\"type\":\"Ping\"},{\"type\":\"Text\",\"body\":\"x\"}]".fromJson[JsValue].convertTo[Seq[Message]] shouldBe
+      Seq(Message.Ping, Message.Text("x"))
+
+    (Message.Text("hi"): Message).toJsonValue.convertTo[Message] shouldBe Message.Text("hi")
+  }
+
+  it should "serialize fields of opaque types" in {
+    val user = User(UserId(1), Some(UserId(2)))
+    user.toJsonString shouldBe "{\"id\":\"u-1\",\"parent\":\"u-2\"}"
+    "{\"id\":\"u-1\",\"parent\":\"u-2\"}".fromJson[User] shouldBe user
+    "{\"id\":\"u-3\"}".fromJson[User] shouldBe User(UserId(3), None)
+
+    an [ParseException] shouldBe thrownBy { "{}".fromJson[User] }
   }
 
   it should "serialize collections" in {

@@ -36,7 +36,7 @@ extends GenerationCandidate {
 
     def singletonValue(using Quotes): Expr[C] = {
       import quotes.reflect.*
-      Select(Ident(typeSymbol.companionModule.termRef.asInstanceOf[TermRef]), sym.asInstanceOf[Symbol]).asExprOf[C]
+      Ref(sym.asInstanceOf[Symbol]).asExprOf[C]
     }
 
     def decode(reader: Expr[JsonReader])(using Quotes): Expr[C] =
@@ -103,8 +103,7 @@ extends GenerationCandidate {
       cases
         .map {
           case c if c.singleton =>
-            val outerIdent = Ident(typeSymbol.companionModule.asInstanceOf[Symbol].termRef)
-            CaseDef(Select(outerIdent, c.sym.asInstanceOf[Symbol]), None, encodeCase(c)(writer, null).asTerm)
+            CaseDef(Ref(c.sym.asInstanceOf[Symbol]), None, encodeCase(c)(writer, null).asTerm)
 
           case c =>
             val caseSym = c.sym.asInstanceOf[Symbol] // cast to Symbol in this Quotes universe

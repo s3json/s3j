@@ -16,7 +16,7 @@ object JsonLocation {
   }
 }
 
-/** Object pointing to a specific place in JSON document where something (e.g. error) has been ocurred */
+/** Object pointing to a specific place in JSON document where something has occurred */
 sealed trait JsonLocation {
   def toPath: Option[JsPath]
 }

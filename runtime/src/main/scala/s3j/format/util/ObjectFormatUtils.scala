@@ -138,7 +138,11 @@ object ObjectFormatUtils {
       case innerReader: JsonReader.Buffered =>
         val location = innerReader.location.toPath.getOrElse(JsPath.Root)
         val keys = innerReader.remainingKeys // as we have passed 'expectBeginObject', this should be an object.
-        decodeBufferedDiscriminator(innerReader, location, innerReader.readEnclosingValue().asObject, keys, field)
+        val obj = innerReader.enclosingValue.asObject
+
+        // Consume object contents, but leave TStructureEnd in the stream: it will be read later in main decoder code.
+        skipRemainingFields(innerReader)
+        decodeBufferedDiscriminator(innerReader, location, obj, keys, field)
 
       case innerReader => innerReader.nextToken() match {
         case JsonToken.TKey if innerReader.key.stringEquals(field) =>

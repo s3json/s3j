@@ -19,7 +19,9 @@ object CodeUtils {
       case '[ Float ]     => Expr(0.0F)
       case '[ Double ]    => Expr(0.0D)
       case '[ Unit ]      => '{ () }
-      case _ => quotes.reflect.report.errorAndAbort("Unsupported type for placeholder: " + Type.show[T])
+
+      // Types with unknown representation (e.g. opaque types): erased null unboxes to zero for primitives
+      case _ => '{ null.asInstanceOf[T] }
     }).asInstanceOf[Expr[T]]
 
   /** Place all statements into a single block, using last block as a result */

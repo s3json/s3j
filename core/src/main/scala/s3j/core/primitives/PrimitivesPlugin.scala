@@ -25,7 +25,7 @@ class PrimitivesPlugin extends Plugin {
                                 (using tt: Type[T], ctx: GenerationContext)
   extends GenerationCandidate {
     val unsigned: Boolean = modifiers.contains(UnsignedModifier)
-    def confidence: GenerationConfidence = GenerationConfidence.Certain
+    def confidence: GenerationConfidence = 10000 // specific formatting annotations could still override this
     def identity: AnyRef = PrimitiveIdentity(unsigned)
 
     private def format(using q: Quotes): FormatSpecification[T] = {
