@@ -4,7 +4,9 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import s3j.ast.{JsArray, JsObject, JsValue}
 import s3j.format.util.ObjectFormatUtils
-import s3j.io.{AstJsonReader, JsonReader, JsonToken}
+import s3j.io.{AstJsonReader, JsonReader, JsonToken, ParseException, StreamJsonReader}
+
+import java.io.StringReader
 
 class ObjectFormatUtilsTest extends AnyFlatSpec with Matchers {
   /** Decode discriminated object the same way as generated enum decoders do */
@@ -46,5 +48,35 @@ class ObjectFormatUtilsTest extends AnyFlatSpec with Matchers {
 
     reader.nextToken() shouldBe JsonToken.TNumber
     reader.nextToken() shouldBe JsonToken.TStructureEnd
+  }
+
+  private def streamReader(json: String, config: JsonReader.ReadingConfig = JsonReader.DefaultConfig): JsonReader =
+    new StreamJsonReader(new StringReader(json), config)
+
+  it should "reject out-of-order discriminator in stream reader by default" in {
+    a [ParseException] shouldBe thrownBy { decodeDiscriminated(streamReader("""{"x":1,"type":"A"}""")) }
+  }
+
+  it should "buffer out-of-order discriminator in stream reader when enabled by reader config" in {
+    val reader = streamReader("""[{"x":1,"type":"A","y":true},{"type":"B","z":2}]""",
+      JsonReader.ReadingConfig(allowBuffering = true))
+
+    reader.nextToken() shouldBe JsonToken.TArrayStart
+    decodeDiscriminated(reader) shouldBe ("A" -> JsObject("x" -> 1, "y" -> true))
+    decodeDiscriminated(reader) shouldBe ("B" -> JsObject("z" -> 2))
+    reader.nextToken() shouldBe JsonToken.TStructureEnd
+    reader.nextToken() shouldBe JsonToken.TEndOfStream
+  }
+
+  it should "propagate reader config to readers created for discriminated objects" in {
+    val config = JsonReader.ReadingConfig(allowBuffering = true)
+
+    val direct = ObjectFormatUtils.decodeDiscriminator(streamReader("""{"type":"A","x":1}""", config), "type", 64,
+      allowBuffering = false)
+    direct.nn.reader.config shouldBe config
+
+    val buffered = ObjectFormatUtils.decodeDiscriminator(streamReader("""{"x":1,"type":"A"}""", config), "type", 64,
+      allowBuffering = false)
+    buffered.nn.reader.config shouldBe config
   }
 }

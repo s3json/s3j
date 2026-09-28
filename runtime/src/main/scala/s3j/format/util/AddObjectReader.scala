@@ -10,7 +10,7 @@ import s3j.io.{JsonLocation, JsonReader, JsonToken, KeyHandle}
  * Recognized by [[ObjectFormatUtils.expectBeginObject]] and [[ObjectFormatUtils.expectEndObject]]: it will incur no
  * overhead at all for anything using these functions to decode objects.
  */
-final case class AddObjectReader(reader: JsonReader) extends JsonReader {
+final case class AddObjectReader(reader: JsonReader) extends JsonReader(reader.config) {
   private var _objectStarted: Boolean = false
   private var _nesting: Int = 0
   

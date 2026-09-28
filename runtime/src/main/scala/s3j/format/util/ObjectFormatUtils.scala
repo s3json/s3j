@@ -119,7 +119,7 @@ object ObjectFormatUtils {
 
     val subNode = ast.subObject(keys.filterNot(_ == field))
 
-    DiscriminatorResult(new AstJsonReader(subNode, prefix), discriminator)
+    DiscriminatorResult(new AstJsonReader(subNode, config = reader.config, locationPrefix = prefix), discriminator)
   }
 
   /**
@@ -151,7 +151,7 @@ object ObjectFormatUtils {
           else DiscriminatorResult(AddObjectReader(innerReader), discriminator)
 
         case JsonToken.TKey =>
-          if (!allowBuffering) {
+          if (!allowBuffering && !reader.config.allowBuffering) {
             innerReader.parseError("discriminator field '" + field + "' must come first")
           }
 

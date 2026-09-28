@@ -12,8 +12,12 @@ private[io] object AstJsonReader {
   final val NNumber   = 3
 }
 
-class AstJsonReader(node: JsValue, locationPrefix: JsPath = JsPath.Root, chunkLength: Int = 1024)
-extends JsonReader with JsonReader.Buffered {
+class AstJsonReader(
+  node: JsValue,
+  config: JsonReader.ReadingConfig = JsonReader.DefaultConfig,
+  locationPrefix: JsPath = JsPath.Root,
+  chunkLength: Int = 1024
+) extends JsonReader(config) with JsonReader.Buffered {
   import AstJsonReader._
 
   private class StackEntry(val node: JsValue) {

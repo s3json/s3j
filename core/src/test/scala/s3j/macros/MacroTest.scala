@@ -6,9 +6,10 @@ import s3j.annotations.*
 import s3j.annotations.naming.{camelCase, capitalizedKebabCase, screamingSnakeCase, snakeCase}
 import s3j.ast.{JsObject, JsValue}
 import s3j.format.BasicFormats
-import s3j.io.ParseException
+import s3j.io.{JsonReader, ParseException, StreamJsonReader}
 import s3j.{*, given}
 
+import java.io.StringReader
 import java.util
 
 object MacroTest {
@@ -35,6 +36,18 @@ object MacroTest {
 
   import ids.UserId
   case class User(id: UserId, parent: Option[UserId]) derives JsonFormat
+
+  // Enum without own format, used only as a nested value of other enums:
+  enum Inner {
+    case P(v: Int)
+    case Q
+  }
+
+  enum Outer derives JsonFormat {
+    case W(inner: Inner)
+  }
+
+  case class Holder(items: Seq[Inner], outer: Outer) derives JsonFormat
 }
 
 class MacroTest extends AnyFlatSpec with Matchers {
@@ -196,6 +209,44 @@ class MacroTest extends AnyFlatSpec with Matchers {
     }
 
     "{\"x\":\"1\",\"type\":\"A\"}".fromJson[Test] shouldBe Test.A("1")
+  }
+
+  private val bufferingConfig = JsonReader.ReadingConfig(allowBuffering = true)
+
+  private def decodeWith[T](json: String, config: JsonReader.ReadingConfig)(using dec: JsonDecoder[T]): T =
+    dec.decode(new StreamJsonReader(new StringReader(json), config))
+
+  it should "work with out-of-order discriminator if buffering is enabled in reader config" in {
+    enum Test derives JsonFormat {
+      case A(x: String)
+      case B
+    }
+
+    decodeWith[Test]("{\"x\":\"1\",\"type\":\"A\"}", bufferingConfig) shouldBe Test.A("1")
+    decodeWith[Test]("{\"type\":\"A\",\"x\":\"1\"}", bufferingConfig) shouldBe Test.A("1")
+    decodeWith[Test]("{\"type\":\"B\"}", bufferingConfig) shouldBe Test.B
+
+    a [ParseException] shouldBe thrownBy {
+      decodeWith[Test]("{\"x\":\"1\",\"type\":\"A\"}", JsonReader.DefaultConfig)
+    }
+  }
+
+  it should "apply buffering from reader config to nested values" in {
+    // Nested enum inside of enum case, which is decoded after discriminator (first and out of order):
+    decodeWith[Outer]("{\"type\":\"W\",\"inner\":{\"v\":1,\"type\":\"P\"}}", bufferingConfig) shouldBe
+      Outer.W(Inner.P(1))
+
+    decodeWith[Outer]("{\"inner\":{\"v\":1,\"type\":\"P\"},\"type\":\"W\"}", bufferingConfig) shouldBe
+      Outer.W(Inner.P(1))
+
+    // Nested enums inside of collections and case classes:
+    decodeWith[Holder]("{\"items\":[{\"v\":1,\"type\":\"P\"},{\"type\":\"Q\"}]," +
+      "\"outer\":{\"inner\":{\"type\":\"Q\"},\"type\":\"W\"}}", bufferingConfig) shouldBe
+      Holder(Seq(Inner.P(1), Inner.Q), Outer.W(Inner.Q))
+
+    a [ParseException] shouldBe thrownBy {
+      decodeWith[Outer]("{\"type\":\"W\",\"inner\":{\"v\":1,\"type\":\"P\"}}", JsonReader.DefaultConfig)
+    }
   }
 
   it should "fail on extra fields in singleton enum cases" in {

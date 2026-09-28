@@ -6,7 +6,22 @@ import s3j.format.util.DecoderUtils
 import s3j.io.util.CharRange
 
 object JsonReader {
-  /** Reader that already has AST available to avoid serialization and parsing round-trip */
+  /**
+   * Configuration options controlling deserialization behavior.
+   *
+   * @param allowBuffering Whether to buffer input while looking for the discriminator field of a sealed hierarchy,
+   *                       allowing the discriminator to appear anywhere in the object instead of having to come first.
+   *                       When not specified, this is determined for each type by the presence of an `@allowBuffering`
+   *                       annotation.
+   */
+  case class ReadingConfig(
+    allowBuffering: Boolean = false
+  )
+
+  /** Default reader configuration */
+  val DefaultConfig: ReadingConfig = ReadingConfig()
+
+  /** Reader backed by an existing AST, avoiding a serialization-and-parsing round trip. */
   trait Buffered { this: JsonReader =>
     /**
      * {{{
@@ -32,7 +47,7 @@ object JsonReader {
 }
 
 /** High-level JSON reader, outputting a token stream */
-abstract class JsonReader {
+abstract class JsonReader(val config: JsonReader.ReadingConfig) {
   private var _savedToken: Int = -1
 
   /** @return Next token from the stream */
@@ -120,12 +135,19 @@ abstract class JsonReader {
   /** Decode double value from stream */
   def readDouble(): Double = NumberFormats.decodeDouble(this)
 
-  /** Decode string value from the stream */
+  /**
+   * Decode a string value from the stream.
+   *
+   * This method imposes no length limit and may therefore consume an unbounded amount of memory if the streamed input
+   * contains an excessively long string.
+   */
   def readString(): String = DecoderUtils.decodeStringRaw(this, Int.MaxValue)
 
   /**
-   * Decode string value from stream up to length limit, returning `null` (and leaving reader in an undefined state)
-   * when limit is exhausted
+   * Decode a string value from the stream up to the specified length limit.
+   *
+   * @return The decoded string, or `null` if the length limit is exceeded. In the latter case, the reader is left in
+   *         an undefined state.
    */
   def readString(lengthLimit: Int): String | Null = DecoderUtils.decodeStringRaw(this, lengthLimit)
 }

@@ -25,7 +25,11 @@ object StreamJsonReader {
   private final val SDataChunk      = 10
 }
 
-class StreamJsonReader(in: Reader, settings: ReaderSettings = StreamJsonReader.defaultSettings) extends JsonReader {
+class StreamJsonReader(
+  in: Reader,
+  config: JsonReader.ReadingConfig = JsonReader.DefaultConfig,
+  settings: ReaderSettings = StreamJsonReader.defaultSettings
+) extends JsonReader(config) {
   private val lexer: JsonLexer = new JsonLexer(in, settings.chunkLength, settings.contextLength)
   private val pathBuilder: JsPathBuilder = new JsPathBuilder(settings.maxKeyLength, settings.maxNesting)
 

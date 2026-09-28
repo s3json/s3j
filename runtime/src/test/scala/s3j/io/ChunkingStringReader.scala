@@ -3,7 +3,7 @@ package s3j.io
 import s3j.io.util.CharRange
 
 /** Special JSON reader that outputs single string in chunks, for testing streaming decoders */
-class ChunkingStringReader(chunks: Seq[String]) extends JsonReader {
+class ChunkingStringReader(chunks: Seq[String]) extends JsonReader(JsonReader.DefaultConfig) {
   val chunk: CharRange = new CharRange(chunks.map(_.length).max)
   private var chunkIdx = 0
 

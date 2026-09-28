@@ -12,7 +12,7 @@ class ReferenceReaderTest extends AnyFlatSpec with Matchers {
       val contextLength = 32
       val tokens1 = new ReferenceJsonReader(json, contextLength).result
       val tokens2 = ReferenceJsonReader.gatherTokens(new StreamJsonReader(new StringReader(json),
-        StreamJsonReader.defaultSettings.copy(contextLength = contextLength)))
+        settings = StreamJsonReader.defaultSettings.copy(contextLength = contextLength)))
 
       if (tokens1 != tokens2) {
         for (i <- 0 until math.max(tokens1.size, tokens2.size)) {
