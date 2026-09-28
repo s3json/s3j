@@ -1,7 +1,7 @@
 package s3j.core.casecls
 
 import s3j.annotations.naming.*
-import s3j.annotations.{allowUnknownKeys, failUnknownKeys, inlineObject, key, keyPrefix, nullOption, restFields}
+import s3j.annotations.{allowUnknownKeys, denyUnknownKeys, inlineObject, key, keyPrefix, nullOption, restFields}
 import s3j.core.casecls.impl.{CaseClassCandidate, InlineObjectExtension, OptionExtension, PlainFieldExtension, RestFieldsExtension}
 import s3j.core.casecls.modifiers.{FieldCaseModifier, FieldKeyModifier, InlineObjectModifier, KeyPrefixModifier, NullOptionModifier, RestFieldsModifier, UnknownKeysModifier}
 import s3j.core.enums.modifiers.EnumCaseModifier
@@ -25,7 +25,7 @@ class CaseClassPlugin extends Plugin {
 
   override def modifierParser(using PluginContext): ModifierParser = ModifierParser.builder
     .parse[allowUnknownKeys](UnknownKeysModifier(true))
-    .parse[failUnknownKeys](UnknownKeysModifier(false))
+    .parse[denyUnknownKeys](UnknownKeysModifier(false))
     .parse[restFields](RestFieldsModifier)
     .parse[nullOption](NullOptionModifier)
     .parse[inlineObject](InlineObjectModifier)

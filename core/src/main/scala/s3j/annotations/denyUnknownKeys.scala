@@ -7,4 +7,4 @@ import scala.annotation.StaticAnnotation
  *
  * Undoes effect of [[allowUnknownKeys]].
  */
-class failUnknownKeys extends StaticAnnotation
+class denyUnknownKeys extends StaticAnnotation

@@ -4,7 +4,7 @@ import scala.annotation.StaticAnnotation
 
 /**
  * When applied to a parameter of type `JsObject`, causes that parameter to serve as a place for all unmatched fields.
- * Undoes effect of [[failUnknownKeys]].
+ * Undoes effect of [[denyUnknownKeys]].
  *
  * ==Example usage:==
  * {{{
