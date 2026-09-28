@@ -8,7 +8,7 @@ import java.io.StringWriter
 class StreamWriterTest extends AnyFlatSpec with Matchers {
   private def generateJson(indent: Int, f: JsonWriter => Unit): String = {
     val sw = new StringWriter()
-    f(new StreamJsonWriter(sw, indent))
+    f(new StreamJsonWriter(sw, StreamJsonWriter.WriterSettings(indent = indent)))
     sw.toString
   }
 
@@ -56,7 +56,7 @@ class StreamWriterTest extends AnyFlatSpec with Matchers {
 
   it should "serialize escaped <script> tag" in {
     generateJson(0, _.stringValue("<script>alert(1);</script>")) shouldBe
-      "\"\\u003Cscript>alert(1);\\u003C/script>\""
+      "\"\\u003Cscript\\u003Ealert(1);\\u003C/script\\u003E\""
   }
 
   it should "serialize escaped strings" in {

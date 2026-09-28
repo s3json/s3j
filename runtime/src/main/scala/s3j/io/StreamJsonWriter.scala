@@ -6,15 +6,38 @@ import java.io.Writer
 
 object StreamJsonWriter {
   private val IndentSpaceBuffer = Array.fill[Char](32)(' ')
+
+  val DefaultSettings: WriterSettings = WriterSettings()
+
+  /**
+   * Settings that control how JSON output is rendered.
+   *
+   * @param indent         Indentation used for pretty-printing. A value of zero produces compact output; a non-zero
+   *                       value specifies the number of spaces per nesting level.
+   * @param escapeHtml     Whether to escape HTML-sensitive characters that could be unsafe when the output is embedded
+   *                       in a `<script>` tag.
+   * @param escapeUnicode  Whether to escape non-printable Unicode characters that are valid in JSON but may cause
+   *                       rendering issues, ambiguity, or difficulties when handled manually.
+   * @param escapeEightBit Whether to escape any character outside the basic ASCII range.
+   */
+  case class WriterSettings(
+    indent:         Int = 0,
+    escapeHtml:     Boolean = true,
+    escapeUnicode:  Boolean = true,
+    escapeEightBit: Boolean = false,
+  )
 }
 
 /**
  * Writer implementation backed by a character stream.
  *
- * @param out    Underlying writer to use
- * @param indent Indentation for the output, `0` - compact format.
+ * @param out      Underlying writer to use
+ * @param settings Settings that control JSON output formatting and escaping.
  */
-class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
+class StreamJsonWriter(
+  out: Writer,
+  settings: StreamJsonWriter.WriterSettings = StreamJsonWriter.DefaultSettings
+) extends JsonWriter {
   private class StackEntry(val isRoot: Boolean = false, val isArray: Boolean = false, var isString: Boolean = false) {
     var hasValues: Boolean = false
     var firstChunk: Boolean = true
@@ -24,6 +47,16 @@ class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
   private var states: List[StackEntry] = new StackEntry(isRoot = true) :: Nil
   private val stateMachine: WriterStateMachine = new WriterStateMachine
   private def state: StackEntry = states.head
+
+  private val indent = settings.indent
+
+  private val escapeClasses: Byte = {
+    var result = EscapeUtils.CEscapeAlways
+    if (settings.escapeHtml) result |= EscapeUtils.CEscapeHtml
+    if (settings.escapeUnicode) result |= EscapeUtils.CEscapeDiscretionary
+    if (settings.escapeEightBit) result |= EscapeUtils.CEscape8bit
+    result.toByte
+  }
 
   private def writeNewline(): Unit = {
     if (indent == 0) {
@@ -73,7 +106,7 @@ class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
 
   private def writeString(str: String): Unit = {
     out.write('"')
-    EscapeUtils.writeEscaped(str, out)
+    EscapeUtils.writeEscaped(str, escapeClasses, out)
     out.write('"')
   }
 
@@ -167,7 +200,7 @@ class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
 
   def stringValue(value: String): JsonWriter = {
     if (state.isString) {
-      EscapeUtils.writeEscaped(value, out)
+      EscapeUtils.writeEscaped(value, escapeClasses, out)
       return this
     }
 
@@ -179,14 +212,14 @@ class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
 
   def stringValue(value: Array[Char], offset: Int, length: Int): JsonWriter = {
     if (state.isString) {
-      EscapeUtils.writeEscaped(value, offset, length, out)
+      EscapeUtils.writeEscaped(value, offset, length, escapeClasses, out)
       return this
     }
 
     stateMachine.value()
     preValue()
     out.write('"')
-    EscapeUtils.writeEscaped(value, offset, length, out)
+    EscapeUtils.writeEscaped(value, offset, length, escapeClasses, out)
     out.write('"')
     this
   }
@@ -202,7 +235,7 @@ class StreamJsonWriter(out: Writer, indent: Int = 0) extends JsonWriter {
 
   def rawChunk(chunk: Array[Char], offset: Int, length: Int): JsonWriter = {
     if (state.isString) {
-      EscapeUtils.writeEscaped(chunk, offset, length, out)
+      EscapeUtils.writeEscaped(chunk, offset, length, escapeClasses, out)
     } else {
       if (state.firstChunk) {
         stateMachine.value()

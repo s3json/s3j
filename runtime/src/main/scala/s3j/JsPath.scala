@@ -4,6 +4,9 @@ import s3j.io.util.EscapeUtils
 import scala.collection.mutable
 
 object JsPath {
+  /** Paths are meant for humans: keep readable non-ASCII text, HTML escaping is irrelevant for diagnostics */
+  private val KeyEscapeClasses: Byte = (EscapeUtils.CEscapeAlways | EscapeUtils.CEscapeDiscretionary).toByte
+
   case object Root extends JsPath {
     protected def buildString(sb: mutable.StringBuilder): Unit = sb += '$'
   }
@@ -25,7 +28,7 @@ object JsPath {
     protected def buildString(sb: mutable.StringBuilder): Unit = {
       parent.buildString(sb)
       if (keyValid) sb += '.' ++= key
-      else sb ++= "[\"" ++= EscapeUtils.escape(key) ++= "\"]"
+      else sb ++= "[\"" ++= EscapeUtils.escape(key, JsPath.KeyEscapeClasses) ++= "\"]"
     }
   }
   

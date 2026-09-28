@@ -16,7 +16,7 @@ object IoExtensions {
     /** @return Object serialized as JSON string */
     def toJsonString(indent: Int): String = {
       val writer = new StringWriter()
-      val jsonWriter = new StreamJsonWriter(writer, indent)
+      val jsonWriter = new StreamJsonWriter(writer, StreamJsonWriter.WriterSettings(indent = indent))
       enc.encode(jsonWriter, obj)
       writer.toString
     }

@@ -7,11 +7,19 @@ object EscapeUtils {
   private val _shouldEscape: Array[Byte] = generateShouldEscape()
   private val _hexAlphabet: Array[Char] = "0123456789ABCDEF".toCharArray
 
+  // Escape classes in _shouldEscape:
+  final val CEscapeAlways         = 1   // Mandatory per RFC8259
+  final val CEscapeHtml           = 2   // Security-relevant when inserted into <script>
+  final val CEscapeDiscretionary  = 4   // Weird Unicode characters that would be unpleasant to see directly
+  final val CEscape8bit           = 8   // Any 8-bit character, leaving 7-bit output only.
+
+  final val EscapeAll: Byte = 0xFF.toByte // all classes combined
+
   /** Maximum possible escape length */
   val EscapeLength: Int = 6
 
   /** @return Whether character 'c' should be escaped or could be used as-is */
-  def shouldEscape(c: Char): Boolean = _shouldEscape(c) != 0
+  def shouldEscape(c: Char, mask: Byte): Boolean = (_shouldEscape(c) & mask) != 0
 
   /** Place escaped version of character `c` into array `out` and return length of the escape */
   def formatEscape(c: Char, out: Array[Char]): Int = {
@@ -37,14 +45,14 @@ object EscapeUtils {
   }
 
   /** Write escaped data from given char array into writer */
-  def writeEscaped(data: Array[Char], offset: Int, length: Int, out: Writer): Unit = {
+  def writeEscaped(data: Array[Char], offset: Int, length: Int, escapeClasses: Byte, out: Writer): Unit = {
     var idx: Int = offset
     val end: Int = offset + length
     var esc: Array[Char] | Null = null
 
     while (idx < end) {
       var nextEscaped: Int = idx
-      while (nextEscaped < end && _shouldEscape(data(nextEscaped)) == 0) nextEscaped += 1
+      while (nextEscaped < end && (_shouldEscape(data(nextEscaped)) & escapeClasses) == 0) nextEscaped += 1
 
       if (nextEscaped != end) {
         // noinspection DuplicatedCode
@@ -66,14 +74,14 @@ object EscapeUtils {
   }
 
   /** Write escaped version of given string into writer */
-  def writeEscaped(str: String, out: Writer): Unit = {
+  def writeEscaped(str: String, escapeClasses: Byte, out: Writer): Unit = {
     var idx: Int = 0
     val end: Int = str.length
     var esc: Array[Char] | Null = null
 
     while (idx < end) {
       var nextEscaped: Int = idx
-      while (nextEscaped < end && _shouldEscape(str.charAt(nextEscaped)) == 0) nextEscaped += 1
+      while (nextEscaped < end && (_shouldEscape(str.charAt(nextEscaped)) & escapeClasses) == 0) nextEscaped += 1
 
       if (nextEscaped != end) {
         // noinspection DuplicatedCode
@@ -95,9 +103,9 @@ object EscapeUtils {
   }
 
   /** Get escaped version of a string */
-  def escape(s: String): String = {
+  def escape(s: String, escapeClasses: Byte = EscapeAll): String = {
     val sw = new StringWriter()
-    writeEscaped(s, sw)
+    writeEscaped(s, escapeClasses, sw)
     sw.toString
   }
 
@@ -105,17 +113,25 @@ object EscapeUtils {
     val r = new Array[Byte](65536)
 
     for (c <- '\u0000' to '\uFFFF') {
-      // We always escape '<' to be on safe side if output is embedded on the web page.
-      // E.g. valid JSON in following example triggers XSS because browser parses HTML first, and then JSON:
-      //
-      //  <script>window.state = {"test":"</script><script>alert(1)</script>"}</script>
-      //
-      // We escape '<' instead of usual '/' to get much more fancier URLs which are much more common than tags.
+      var cls = 0
 
-      val esc = c == '"' || c == '\\' || c == '<' || !((c >= ' ' && c < 127) || Character.isAlphabetic(c) &&
-        Character.isLetterOrDigit(c))
+      if (c < ' ' || c == '"' || c == '\\') {
+        cls |= CEscapeAlways
+      }
 
-      r(c) = if (esc) 1 else 0
+      if (c == '<' || c == '>' || c == '&' || c == '\u2028' || c == '\u2029') {
+        cls |= CEscapeHtml
+      }
+
+      if (c >= 127 && !(Character.isAlphabetic(c) || Character.isLetterOrDigit(c))) {
+        cls |= CEscapeDiscretionary
+      }
+
+      if (c >= 127) {
+        cls |= CEscape8bit
+      }
+
+      r(c) = cls.toByte
     }
 
     r

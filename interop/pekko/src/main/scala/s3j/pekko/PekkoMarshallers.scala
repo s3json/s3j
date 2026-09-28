@@ -18,7 +18,8 @@ object PekkoMarshallers {
 
   def encodeEntity[T](data: T, indent: Int = 0)(using JsonEncoder[_ >: T], ExecutionContext, Materializer): RequestEntity = {
     val builder = ByteString.newBuilder
-    val writer = new StreamJsonWriter(new OutputStreamWriter(builder.asOutputStream, StandardCharsets.UTF_8), indent)
+    val writer = new StreamJsonWriter(new OutputStreamWriter(builder.asOutputStream, StandardCharsets.UTF_8),
+      StreamJsonWriter.WriterSettings(indent = indent))
     implicitly[JsonEncoder[_ >: T]].encode(writer, data)
     writer.close()
     HttpEntity(ContentTypes.`application/json`, builder.result())

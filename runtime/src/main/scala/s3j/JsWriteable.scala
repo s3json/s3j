@@ -38,7 +38,7 @@ abstract class JsWriteable {
   /** @return Stored value encoded as string with given indentation */
   def toJsonString(indent: Int): String = {
     val stringWriter = new StringWriter()
-    val jsonWriter = new StreamJsonWriter(stringWriter, indent)
+    val jsonWriter = new StreamJsonWriter(stringWriter, StreamJsonWriter.WriterSettings(indent = indent))
     encode(jsonWriter)
     jsonWriter.close()
     stringWriter.toString
